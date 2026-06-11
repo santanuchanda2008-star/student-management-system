@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Management System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="topbar">
+        <div>
+            <h1>Student Management System</h1>
+        </div>
+    </header>
+
+    <main class="layout">
+        <section class="panel login-panel" id="loginPanel">
+            <h2>Login</h2>
+            <label for="username">Username</label>
+            <input type="text" id="username" placeholder="Enter username">
+
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="Enter password">
+
+            <button onclick="login()">Login</button>
+            <button class="secondary" onclick="showCreateAccount()">Create Account</button>
+            <button class="secondary" onclick="showForgotPassword()">Forgot Password</button>
+            <p id="loginMessage" class="message"></p>
+        </section>
+
+        <section class="panel login-panel hidden" id="createPanel">
+            <h2>Create Account</h2>
+            <label for="newUsername">Username</label>
+            <input type="text" id="newUsername" placeholder="Create username">
+
+            <label for="newPassword">Password</label>
+            <input type="password" id="newPassword" placeholder="Create password">
+
+            <button onclick="createAccount()">Create Account</button>
+            <button class="secondary" onclick="showLoginPanel()">Back to Login</button>
+            <p id="createMessage" class="message"></p>
+        </section>
+
+        <section class="panel login-panel hidden" id="forgotPanel">
+            <h2>Forgot Password</h2>
+            <label for="forgotUsername">Username</label>
+            <input type="text" id="forgotUsername" placeholder="Enter username">
+
+            <label for="forgotPassword">New Password</label>
+            <input type="password" id="forgotPassword" placeholder="Enter new password">
+
+            <label for="confirmForgotPassword">Confirm Password</label>
+            <input type="password" id="confirmForgotPassword" placeholder="Confirm new password">
+
+            <button onclick="resetPassword()">Reset Password</button>
+            <button class="secondary" onclick="showLoginPanel()">Back to Login</button>
+            <p id="forgotMessage" class="message"></p>
+        </section>
+
+        <section class="panel dashboard hidden" id="dashboard">
+            <div class="dashboard-head">
+                <div>
+                    <h2 id="dashboardTitle">Dashboard</h2>
+                    <p id="roleDescription"></p>
+                </div>
+                <button class="secondary compact" onclick="logout()">Logout</button>
+            </div>
+
+            <div class="toolbar" id="dashboardTools">
+                <button onclick="showStudentInformation()">Student Information</button>
+                <button onclick="showAcademicResults()">Academic Result</button>
+                <button id="addStudentMenuButton" onclick="showAddStudentOptions()">Add Student</button>
+                <button id="modifyGradeMenuButton" onclick="showModifyGradeOptions()">Modify Grades</button>
+            </div>
+
+            <div class="search-row">
+                <input type="text" id="searchInput" placeholder="Search by name, reg no, phone, email, department, or status">
+                <button onclick="searchStudents()">Search</button>
+                <button class="secondary" onclick="renderStudents()">Reset</button>
+            </div>
+
+            <div id="addStudentSection" class="hidden">
+                <h3 class="table-title">Add Student</h3>
+                <div class="toolbar">
+                    <button onclick="showAddStudentForm('Studying')">Students</button>
+                    <button onclick="showAddStudentForm('Passed Out')">Passed Out Students</button>
+                </div>
+            </div>
+
+            <form class="form-grid hidden" id="studentForm">
+                <input type="hidden" id="editStudentId">
+                <input type="text" id="regNo" placeholder="Registration Number">
+                <input type="text" id="studentName" placeholder="Student Name" oninput="cleanNameInput()">
+                <input type="text" id="phone" placeholder="Phone Number" maxlength="10" inputmode="numeric" oninput="cleanPhoneInput()">
+                <input type="text" id="department" placeholder="Department Name">
+                <input type="text" id="semester" placeholder="Semester" maxlength="1" inputmode="numeric" oninput="cleanSemesterInput()">
+                <input type="email" id="email" placeholder="Email">
+                <input type="number" id="courseStartYear" placeholder="Course Start Year">
+                <input type="number" id="passoutYear" placeholder="Pass Out Year">
+                <input type="number" id="backPapers" placeholder="Back Papers" min="0" step="1" value="0">
+                <input type="number" id="cgpa" placeholder="CGPA" min="0" max="10" step="0.01">
+                <input type="number" id="ogpa" placeholder="OGPA" min="0" max="10" step="0.01">
+                <select id="studentStatus" onchange="handleStudentStatusChange()">
+                    <option value="Studying">Studying</option>
+                    <option value="Passed Out">Passed Out</option>
+                </select>
+                <input type="hidden" id="photo">
+                <div class="photo-upload">
+                    <input type="file" id="photoFile" accept="image/*" onchange="previewSelectedPhoto()">
+                    <div id="photoPreview" class="photo-placeholder">No Photo</div>
+                    <button type="button" class="secondary" onclick="clearPhoto()">Remove Photo</button>
+                </div>
+                <button type="button" onclick="saveStudent()">Save Student</button>
+            </form>
+
+            <div id="modifyGradeSection" class="hidden">
+                <h3 class="table-title">Modify Grades</h3>
+                <div class="toolbar">
+                    <button onclick="showGradeForm('Studying')">Students</button>
+                    <button onclick="showGradeForm('Passed Out')">Passed Out Students</button>
+                </div>
+            </div>
+
+            <form class="form-grid hidden" id="gradeForm">
+                <input type="number" id="gradeStudentId" placeholder="Student ID">
+                <select id="grade">
+                    <option value="">Select Grade</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                    <option value="D">D</option>
+                    <option value="F">F</option>
+                </select>
+                <input type="number" id="gradeCgpa" placeholder="CGPA for studying student" min="0" max="10" step="0.01">
+                <input type="number" id="gradeOgpa" placeholder="OGPA for passed out student" min="0" max="10" step="0.01">
+                <button type="button" onclick="saveGrade()">Save Grade</button>
+            </form>
+
+            <div id="studentInfoSection">
+                <h3 class="table-title">Student Information</h3>
+                <div class="toolbar">
+                    <button onclick="showStudyingStudentInformation()">Students</button>
+                    <button onclick="showPassedOutStudentInformation()">Passed Out Students</button>
+                </div>
+
+                <div id="studyingInfoSection" class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Student ID</th>
+                                <th>Photo</th>
+                                <th>Name</th>
+                                <th>Registration Number</th>
+                                <th>Phone Number</th>
+                                <th>Semester</th>
+                                <th>Email</th>
+                                <th>Course Duration</th>
+                                <th>Status</th>
+                                <th id="infoActionHeader">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentInfoTable"></tbody>
+                    </table>
+                </div>
+
+                <div id="passedOutInfoSection" class="table-wrap hidden">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Student ID</th>
+                                <th>Photo</th>
+                                <th>Name</th>
+                                <th>Registration Number</th>
+                                <th>Phone Number</th>
+                                <th>Semester</th>
+                                <th>Email</th>
+                                <th>Course Duration</th>
+                                <th>Status</th>
+                                <th id="passedInfoActionHeader">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="passedOutInfoTable"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="academicResultSection" class="hidden">
+                <h3 class="table-title">Academic Results</h3>
+                <div class="toolbar">
+                    <button onclick="showStudyingAcademicResults()">Students</button>
+                    <button onclick="showPassedOutAcademicResults()">Passed Out Students</button>
+                </div>
+
+                <div id="studyingAcademicSection" class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Reg No</th>
+                                <th>Name</th>
+                                <th>Department</th>
+                                <th>Sem</th>
+                                <th>Grade</th>
+                                <th>CGPA</th>
+                                <th>Back Papers</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentTable"></tbody>
+                    </table>
+                </div>
+
+                <div id="passedOutAcademicSection" class="table-wrap hidden">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Reg No</th>
+                                <th>Name</th>
+                                <th>Department</th>
+                                <th>Course Duration</th>
+                                <th>Grade</th>
+                                <th>OGPA</th>
+                                <th>Back Papers</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="passedOutAcademicTable"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>

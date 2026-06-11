@@ -1,0 +1,6 @@
+*.class
+server.log
+server.err
+.git
+.agents
+.codex
