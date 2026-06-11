@@ -4,8 +4,7 @@ WORKDIR /app
 
 COPY . .
 
-RUN javac -cp ".:lib/ojdbc8.jar" WebServer.java DatabaseConnection.java
-
+RUN javac -cp ".:ojdbc8.jar" WebServer.java DatabaseConnection.java
 EXPOSE 8081
 
-CMD ["java", "-cp", ".:lib/ojdbc8.jar", "WebServer"]
+CMD ["java", "-cp", ".:ojdbc8.jar", "WebServer"]
