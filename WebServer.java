@@ -77,18 +77,45 @@ public class WebServer {
         demoPasswords.put("user", "user123");
         demoRoles.put("user", "user");
 
-        demoStudents.add(new StudentRecord(1, "REG101", "Rahul Sharma", "9876543210", "Computer",
-                3, "rahul@gmail.com", 2024, 2027, "Studying", 0, "8.2",
-                "8.0", "8.1", "8.2", "", "", "", "", "", "A", "Pass"));
-        demoStudents.add(new StudentRecord(2, "REG102", "Priya Kumari", "9876501234", "Electrical",
-                4, "priya@yahoo.com", 2023, 2026, "Studying", 0, "7.8",
-                "7.5", "7.6", "7.7", "7.8", "", "", "", "", "B", "Pass"));
-        demoStudents.add(new StudentRecord(3, "REG103", "Amit Verma", "9876512345", "Mechanical",
-                2, "amit@outlook.com", 2025, 2028, "Studying", 1, "",
-                "", "", "", "", "", "", "", "", "Not Added", "Pending"));
-        demoStudents.add(new StudentRecord(4, "REG090", "Neha Singh", "9876598765", "Computer",
-                6, "neha@gmail.com", 2021, 2024, "Passed Out", 0, "",
-                "", "", "", "", "", "", "8.6", "", "A", "Pass"));
+        demoStudents.add(new StudentRecord(1, "D242523980", "Santanu Chanda", "7400761833", "CST",
+                4, "shantanuchanda@gmail.com", 2024, 2027, "Studying", 0, "6.6",
+                "5.5", "6.6", "6.6", "", "", "", "", "", "B", "Pass"));
+        demoStudents.add(new StudentRecord(2, "D24252390", "Adarsh Darjee", "9884367780", "CST",
+                2, "adarshdarjee123@gmail.com", 2024, 2028, "Studying", 0, "7",
+                "7", "", "", "", "", "", "", "", "A", "Pass"));
+        demoStudents.add(new StudentRecord(3, "D24252678", "Biplab Bauri", "", "CST",
+                4, "xstylishbiplab@gmail.com", 2024, 2026, "Studying", 1, "5.5",
+                "", "", "5.5", "", "", "", "", "", "C", "Pass"));
+        demoStudents.add(new StudentRecord(4, "D252625302", "Param Brata", "9653429834", "ETCE",
+                2, "param@gmail.com", 2025, 2028, "Studying", 4, "3.9",
+                "3.9", "", "", "", "", "", "", "", "F", "Fail"));
+        demoStudents.add(new StudentRecord(5, "D252625311", "Toni Adhikari", "9798909877", "CIVIL",
+                2, "tonistark@gmail.com", 2025, 2028, "Studying", 0, "7.4",
+                "7.4", "", "", "", "", "", "", "", "A", "Pass"));
+        demoStudents.add(new StudentRecord(6, "D242523985", "Aniket Sharma", "9883288372", "CST",
+                4, "aniketsharma2971@gmail.com", 2024, 2026, "Studying", 0, "8.4",
+                "8", "8.6", "8.4", "", "", "", "", "", "A", "Pass"));
+        demoStudents.add(new StudentRecord(7, "D264748289", "Kaushal Rai", "9778666795", "CST",
+                6, "kaushal234@gmail.com", 2023, 2026, "Studying", 0, "6.5",
+                "4", "4.4", "5.5", "6.6", "6.5", "", "", "", "C", "Pass"));
+        demoStudents.add(new StudentRecord(8, "D289768986", "Rajeev Ghaley", "7889887684", "CST",
+                6, "rajeevgayal23@gmail.com", 2024, 2027, "Studying", 0, "7.8",
+                "6.7", "7.8", "8.4", "7.8", "7.8", "", "", "", "A", "Pass"));
+        demoStudents.add(new StudentRecord(9, "D247878478", "Pragyani Chettri", "9880393487", "CST",
+                6, "pragyanichettri@gmail.com", 2021, 2025, "Passed Out", 0, "8.8",
+                "7", "8", "7.6", "8", "7.6", "8.8", "8.2", "", "A", "Pass"));
+        demoStudents.add(new StudentRecord(10, "D247878450", "Himanshu Singha", "8768758938", "CST",
+                6, "himanshukau@gmail.com", 2024, 2027, "Passed Out", 2, "6.4",
+                "4.5", "6", "7", "7", "7.8", "6.4", "6.2", "", "A", "Pass"));
+        demoStudents.add(new StudentRecord(11, "D24787889", "Nayan Kharel", "6298786782", "ETCE",
+                6, "nayankharel777@gmail.com", 2021, 2024, "Passed Out", 0, "8.3",
+                "8.9", "8.6", "8.7", "8.5", "8.2", "8.3", "8.5", "", "A", "Pass"));
+        demoStudents.add(new StudentRecord(12, "D247878789", "Akhil Pradhan", "8768778945", "CST",
+                6, "hellopixel@gmail.com", 2021, 2024, "Passed Out", 0, "8.6",
+                "7", "7.6", "8.5", "6.5", "7.5", "8.6", "8.2", "", "A", "Pass"));
+        demoStudents.add(new StudentRecord(13, "D789874235", "Lopshang Lepcha", "7450934795", "ETCE",
+                6, "lopbshang22@gmail.com", 2021, 2024, "Passed Out", 0, "7.5",
+                "7", "7.3", "7.4", "7.5", "7.3", "7.5", "7.5", "", "A", "Pass"));
 
         System.out.println("Oracle database is not available. Running in online demo mode.");
     }

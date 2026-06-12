@@ -14,6 +14,10 @@ let selectedGradeStatus = "Studying";
 let presentationDataLoaded = false;
 
 function loadStudents() {
+    if (usesServer) {
+        return [];
+    }
+
     const savedStudents = localStorage.getItem("students");
 
     if (savedStudents) {
@@ -24,6 +28,10 @@ function loadStudents() {
 }
 
 function loadNextStudentId() {
+    if (usesServer) {
+        return 1;
+    }
+
     const savedNextStudentId = localStorage.getItem("nextStudentId");
 
     if (savedNextStudentId) {
@@ -34,6 +42,10 @@ function loadNextStudentId() {
 }
 
 function saveData() {
+    if (usesServer) {
+        return;
+    }
+
     localStorage.setItem("students", JSON.stringify(students));
     localStorage.setItem("nextStudentId", String(nextStudentId));
 }
@@ -270,10 +282,10 @@ async function showDashboard() {
     document.getElementById("passedInfoActionHeader").classList.toggle("hidden", currentRole !== "admin");
     hideForms();
 
-    await loadPresentationData();
-
-    if (usesServer && !presentationDataLoaded) {
+    if (usesServer) {
         await fetchStudents();
+    } else {
+        await loadPresentationData();
     }
 
     renderStudents();
@@ -281,13 +293,6 @@ async function showDashboard() {
 }
 
 async function fetchStudents() {
-    const savedStudents = localStorage.getItem("students");
-    if (savedStudents) {
-        students = JSON.parse(savedStudents);
-        nextStudentId = Math.max(loadNextStudentId(), getNextStudentIdFromStudents());
-        return;
-    }
-
     const response = await fetch("/api/students");
     students = await response.json();
     nextStudentId = getNextStudentIdFromStudents();
@@ -691,8 +696,7 @@ async function saveStudent() {
             alert(result.message || "Student could not be saved.");
             return;
         }
-        applyStudentChange(editId, studentData);
-        saveData();
+        await fetchStudents();
         renderStudents();
         return;
     }
@@ -872,8 +876,7 @@ async function deleteStudent(id) {
             alert(result.message || "Student could not be deleted.");
             return;
         }
-        students = students.filter(student => student.id !== id);
-        saveData();
+        await fetchStudents();
         renderStudents();
         return;
     }
@@ -950,8 +953,7 @@ async function saveGrade() {
             alert(result.message || "Grade could not be saved.");
             return;
         }
-        applyGradeChange(student, grade, semesterCgpas, ogpa);
-        saveData();
+        await fetchStudents();
         renderStudents();
         return;
     }
