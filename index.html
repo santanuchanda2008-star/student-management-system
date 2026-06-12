@@ -131,7 +131,12 @@
                     <option value="D">D</option>
                     <option value="F">F</option>
                 </select>
-                <input type="number" id="gradeCgpa" placeholder="CGPA for studying student" min="0" max="10" step="0.01" oninput="cleanPointAverageInput('gradeCgpa')">
+                <input type="number" id="gradeSem1Cgpa" class="semester-cgpa-input" placeholder="Sem 1 CGPA" min="0" max="10" step="0.01" oninput="cleanPointAverageInput('gradeSem1Cgpa')">
+                <input type="number" id="gradeSem2Cgpa" class="semester-cgpa-input" placeholder="Sem 2 CGPA" min="0" max="10" step="0.01" oninput="cleanPointAverageInput('gradeSem2Cgpa')">
+                <input type="number" id="gradeSem3Cgpa" class="semester-cgpa-input" placeholder="Sem 3 CGPA" min="0" max="10" step="0.01" oninput="cleanPointAverageInput('gradeSem3Cgpa')">
+                <input type="number" id="gradeSem4Cgpa" class="semester-cgpa-input" placeholder="Sem 4 CGPA" min="0" max="10" step="0.01" oninput="cleanPointAverageInput('gradeSem4Cgpa')">
+                <input type="number" id="gradeSem5Cgpa" class="semester-cgpa-input" placeholder="Sem 5 CGPA" min="0" max="10" step="0.01" oninput="cleanPointAverageInput('gradeSem5Cgpa')">
+                <input type="number" id="gradeSem6Cgpa" class="semester-cgpa-input" placeholder="Sem 6 CGPA" min="0" max="10" step="0.01" oninput="cleanPointAverageInput('gradeSem6Cgpa')">
                 <input type="number" id="gradeOgpa" placeholder="OGPA for passed out student" min="0" max="10" step="0.01" oninput="cleanPointAverageInput('gradeOgpa')">
                 <button type="button" onclick="saveGrade()">Save Grade</button>
             </form>
@@ -152,6 +157,7 @@
                                 <th>Name</th>
                                 <th>Registration Number</th>
                                 <th>Phone Number</th>
+                                <th>Semester</th>
                                 <th>Email</th>
                                 <th>Course Duration</th>
                                 <th>Status</th>
@@ -171,7 +177,6 @@
                                 <th>Name</th>
                                 <th>Registration Number</th>
                                 <th>Phone Number</th>
-                                <th>Semester</th>
                                 <th>Email</th>
                                 <th>Course Duration</th>
                                 <th>Status</th>
@@ -200,7 +205,12 @@
                                 <th>Department</th>
                                 <th>Sem</th>
                                 <th>Grade</th>
-                                <th>CGPA</th>
+                                <th>Sem 1 CGPA</th>
+                                <th>Sem 2 CGPA</th>
+                                <th>Sem 3 CGPA</th>
+                                <th>Sem 4 CGPA</th>
+                                <th>Sem 5 CGPA</th>
+                                <th>Sem 6 CGPA</th>
                                 <th>Back Papers</th>
                                 <th>Status</th>
                             </tr>

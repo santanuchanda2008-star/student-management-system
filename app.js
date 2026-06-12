@@ -1,10 +1,11 @@
 const defaultStudents = [
-    { id: 1, regNo: "REG101", name: "Rahul Sharma", phone: "9876543210", department: "Computer", semester: 3, email: "rahul@gmail.com", photo: "", courseStartYear: 2024, passoutYear: 2027, studentStatus: "Studying", backPapers: 0, cgpa: 8.2, ogpa: "", grade: "A", status: "Pass" },
-    { id: 2, regNo: "REG102", name: "Priya Kumari", phone: "9876501234", department: "Electrical", semester: 4, email: "priya@yahoo.com", photo: "", courseStartYear: 2023, passoutYear: 2026, studentStatus: "Studying", backPapers: 0, cgpa: 7.8, ogpa: "", grade: "B", status: "Pass" },
-    { id: 3, regNo: "REG103", name: "Amit Verma", phone: "9876512345", department: "Mechanical", semester: 2, email: "amit@outlook.com", photo: "", courseStartYear: 2025, passoutYear: 2028, studentStatus: "Studying", backPapers: 0, cgpa: "", ogpa: "", grade: "Not Added", status: "Pending" }
+    { id: 1, regNo: "REG101", name: "Rahul Sharma", phone: "9876543210", department: "Computer", semester: 3, email: "rahul@gmail.com", photo: "", courseStartYear: 2024, passoutYear: 2027, studentStatus: "Studying", backPapers: 0, cgpa: 8.2, sem1Cgpa: "8.0", sem2Cgpa: "8.1", sem3Cgpa: "8.2", sem4Cgpa: "", sem5Cgpa: "", sem6Cgpa: "", ogpa: "", grade: "A", status: "Pass" },
+    { id: 2, regNo: "REG102", name: "Priya Kumari", phone: "9876501234", department: "Electrical", semester: 4, email: "priya@yahoo.com", photo: "", courseStartYear: 2023, passoutYear: 2026, studentStatus: "Studying", backPapers: 0, cgpa: 7.8, sem1Cgpa: "7.5", sem2Cgpa: "7.6", sem3Cgpa: "7.7", sem4Cgpa: "7.8", sem5Cgpa: "", sem6Cgpa: "", ogpa: "", grade: "B", status: "Pass" },
+    { id: 3, regNo: "REG103", name: "Amit Verma", phone: "9876512345", department: "Mechanical", semester: 2, email: "amit@outlook.com", photo: "", courseStartYear: 2025, passoutYear: 2028, studentStatus: "Studying", backPapers: 0, cgpa: "", sem1Cgpa: "", sem2Cgpa: "", sem3Cgpa: "", sem4Cgpa: "", sem5Cgpa: "", sem6Cgpa: "", ogpa: "", grade: "Not Added", status: "Pending" }
 ];
 
 const usesServer = window.location.protocol !== "file:";
+const semesterCgpaFields = ["sem1Cgpa", "sem2Cgpa", "sem3Cgpa", "sem4Cgpa", "sem5Cgpa", "sem6Cgpa"];
 let students = loadStudents();
 let nextStudentId = loadNextStudentId();
 let users = usesServer ? [] : loadUsers();
@@ -381,7 +382,12 @@ function renderStudents(list = students) {
                 <td>${student.department}</td>
                 <td>${student.semester}</td>
                 <td>${student.grade}</td>
-                <td>${student.cgpa || ""}</td>
+                <td>${getSemesterCgpa(student, 1)}</td>
+                <td>${getSemesterCgpa(student, 2)}</td>
+                <td>${getSemesterCgpa(student, 3)}</td>
+                <td>${getSemesterCgpa(student, 4)}</td>
+                <td>${getSemesterCgpa(student, 5)}</td>
+                <td>${getSemesterCgpa(student, 6)}</td>
                 <td>${student.backPapers || 0}</td>
                 <td>${student.status}</td>
             `;
@@ -499,6 +505,19 @@ function getCourseDuration(student) {
     return `${student.courseStartYear || ""} - ${student.passoutYear || ""}`;
 }
 
+function getSemesterCgpa(student, semesterNumber) {
+    const key = "sem" + semesterNumber + "Cgpa";
+    if (student[key]) {
+        return student[key];
+    }
+
+    if (Number(student.semester) === semesterNumber && student.cgpa) {
+        return student.cgpa;
+    }
+
+    return "";
+}
+
 function getStudentInitials(name) {
     return String(name || "Student")
         .trim()
@@ -522,6 +541,7 @@ function searchStudents() {
         || String(student.passoutYear || "").includes(keyword)
         || String(student.backPapers || "").includes(keyword)
         || String(student.cgpa || "").includes(keyword)
+        || semesterCgpaFields.some(field => String(student[field] || "").includes(keyword))
         || String(student.ogpa || "").includes(keyword)
         || String(student.id).includes(keyword)
     );
@@ -872,16 +892,21 @@ function showGradeForm(status = "Studying") {
     document.getElementById("gradeForm").classList.remove("hidden");
     document.getElementById("gradeStudentId").value = "";
     document.getElementById("grade").value = "";
-    document.getElementById("gradeCgpa").value = "";
     document.getElementById("gradeOgpa").value = "";
-    document.getElementById("gradeCgpa").classList.toggle("hidden", status !== "Studying");
+    document.querySelectorAll(".semester-cgpa-input").forEach(input => {
+        input.value = "";
+        input.classList.toggle("hidden", status !== "Studying");
+    });
     document.getElementById("gradeOgpa").classList.toggle("hidden", status !== "Passed Out");
 }
 
 async function saveGrade() {
     const studentId = Number(document.getElementById("gradeStudentId").value);
     const grade = document.getElementById("grade").value;
-    const cgpa = document.getElementById("gradeCgpa").value.trim();
+    const semesterCgpas = {};
+    semesterCgpaFields.forEach((field, index) => {
+        semesterCgpas[field] = document.getElementById("gradeSem" + (index + 1) + "Cgpa").value.trim();
+    });
     const ogpa = document.getElementById("gradeOgpa").value.trim();
     const student = students.find(item => item.id === studentId);
 
@@ -895,8 +920,8 @@ async function saveGrade() {
         return;
     }
 
-    if (cgpa && !isValidPointAverage(cgpa)) {
-        alert("CGPA should be between 0 and 10.");
+    if (semesterCgpaFields.some(field => semesterCgpas[field] && !isValidPointAverage(semesterCgpas[field]))) {
+        alert("Semester CGPA should be between 0 and 10.");
         return;
     }
 
@@ -908,32 +933,69 @@ async function saveGrade() {
     if (usesServer) {
         const response = await fetch("/api/students/" + studentId + "/grade", {
             method: "PUT",
-            body: new URLSearchParams({ grade: grade, cgpa: cgpa, ogpa: ogpa })
+            body: new URLSearchParams({
+                grade: grade,
+                cgpa: getLatestCgpaFromSemesterValues(semesterCgpas),
+                ogpa: ogpa,
+                sem1Cgpa: semesterCgpas.sem1Cgpa,
+                sem2Cgpa: semesterCgpas.sem2Cgpa,
+                sem3Cgpa: semesterCgpas.sem3Cgpa,
+                sem4Cgpa: semesterCgpas.sem4Cgpa,
+                sem5Cgpa: semesterCgpas.sem5Cgpa,
+                sem6Cgpa: semesterCgpas.sem6Cgpa
+            })
         });
         const result = await response.json();
         if (!result.success) {
             alert(result.message || "Grade could not be saved.");
             return;
         }
-        applyGradeChange(student, grade, cgpa, ogpa);
+        applyGradeChange(student, grade, semesterCgpas, ogpa);
         saveData();
         renderStudents();
         return;
     }
 
-    applyGradeChange(student, grade, cgpa, ogpa);
+    applyGradeChange(student, grade, semesterCgpas, ogpa);
     saveData();
     renderStudents();
 }
 
-function applyGradeChange(student, grade, cgpa, ogpa) {
+function applyGradeChange(student, grade, semesterCgpas, ogpa) {
     student.grade = grade;
     if ((student.studentStatus || "Studying") === "Studying") {
-        student.cgpa = cgpa;
+        semesterCgpaFields.forEach(field => {
+            if (semesterCgpas[field]) {
+                student[field] = semesterCgpas[field];
+            }
+        });
+        student.cgpa = getLatestCgpaFromStudent(student);
     } else {
         student.ogpa = ogpa;
     }
     student.status = grade === "F" ? "Fail" : "Pass";
+}
+
+function getLatestCgpaFromSemesterValues(semesterCgpas) {
+    for (let index = semesterCgpaFields.length - 1; index >= 0; index--) {
+        const value = semesterCgpas[semesterCgpaFields[index]];
+        if (value) {
+            return value;
+        }
+    }
+
+    return "";
+}
+
+function getLatestCgpaFromStudent(student) {
+    for (let index = semesterCgpaFields.length - 1; index >= 0; index--) {
+        const value = student[semesterCgpaFields[index]];
+        if (value) {
+            return value;
+        }
+    }
+
+    return student.cgpa || "";
 }
 
 function hideForms() {

@@ -78,13 +78,17 @@ public class WebServer {
         demoRoles.put("user", "user");
 
         demoStudents.add(new StudentRecord(1, "REG101", "Rahul Sharma", "9876543210", "Computer",
-                3, "rahul@gmail.com", 2024, 2027, "Studying", 0, "8.2", "", "", "A", "Pass"));
+                3, "rahul@gmail.com", 2024, 2027, "Studying", 0, "8.2",
+                "8.0", "8.1", "8.2", "", "", "", "", "", "A", "Pass"));
         demoStudents.add(new StudentRecord(2, "REG102", "Priya Kumari", "9876501234", "Electrical",
-                4, "priya@yahoo.com", 2023, 2026, "Studying", 0, "7.8", "", "", "B", "Pass"));
+                4, "priya@yahoo.com", 2023, 2026, "Studying", 0, "7.8",
+                "7.5", "7.6", "7.7", "7.8", "", "", "", "", "B", "Pass"));
         demoStudents.add(new StudentRecord(3, "REG103", "Amit Verma", "9876512345", "Mechanical",
-                2, "amit@outlook.com", 2025, 2028, "Studying", 1, "", "", "", "Not Added", "Pending"));
+                2, "amit@outlook.com", 2025, 2028, "Studying", 1, "",
+                "", "", "", "", "", "", "", "", "Not Added", "Pending"));
         demoStudents.add(new StudentRecord(4, "REG090", "Neha Singh", "9876598765", "Computer",
-                6, "neha@gmail.com", 2021, 2024, "Passed Out", 0, "", "8.6", "", "A", "Pass"));
+                6, "neha@gmail.com", 2021, 2024, "Passed Out", 0, "",
+                "", "", "", "", "", "", "8.6", "", "A", "Pass"));
 
         System.out.println("Oracle database is not available. Running in online demo mode.");
     }
@@ -110,6 +114,12 @@ public class WebServer {
                         + "student_status VARCHAR2(30), "
                         + "back_papers NUMBER, "
                         + "cgpa NUMBER(4,2), "
+                        + "sem1_cgpa NUMBER(4,2), "
+                        + "sem2_cgpa NUMBER(4,2), "
+                        + "sem3_cgpa NUMBER(4,2), "
+                        + "sem4_cgpa NUMBER(4,2), "
+                        + "sem5_cgpa NUMBER(4,2), "
+                        + "sem6_cgpa NUMBER(4,2), "
                         + "ogpa NUMBER(4,2), "
                         + "photo_url VARCHAR2(500), "
                         + "photo_data CLOB, "
@@ -123,6 +133,12 @@ public class WebServer {
         addColumnIfMissing(con, "sms_students", "student_status", "VARCHAR2(30)");
         addColumnIfMissing(con, "sms_students", "back_papers", "NUMBER");
         addColumnIfMissing(con, "sms_students", "cgpa", "NUMBER(4,2)");
+        addColumnIfMissing(con, "sms_students", "sem1_cgpa", "NUMBER(4,2)");
+        addColumnIfMissing(con, "sms_students", "sem2_cgpa", "NUMBER(4,2)");
+        addColumnIfMissing(con, "sms_students", "sem3_cgpa", "NUMBER(4,2)");
+        addColumnIfMissing(con, "sms_students", "sem4_cgpa", "NUMBER(4,2)");
+        addColumnIfMissing(con, "sms_students", "sem5_cgpa", "NUMBER(4,2)");
+        addColumnIfMissing(con, "sms_students", "sem6_cgpa", "NUMBER(4,2)");
         addColumnIfMissing(con, "sms_students", "ogpa", "NUMBER(4,2)");
         addColumnIfMissing(con, "sms_students", "photo_url", "VARCHAR2(500)");
         addColumnIfMissing(con, "sms_students", "photo_data", "CLOB");
@@ -439,7 +455,7 @@ public class WebServer {
         try (Connection con = DatabaseConnection.getConnection();
              Statement st = con.createStatement();
              ResultSet rs = st.executeQuery(
-                     "SELECT student_id, registration_number, student_name, phone_number, department_name, semester, email, course_start_year, passout_year, student_status, back_papers, cgpa, ogpa, photo_url, photo_data, grade, result_status "
+                     "SELECT student_id, registration_number, student_name, phone_number, department_name, semester, email, course_start_year, passout_year, student_status, back_papers, cgpa, sem1_cgpa, sem2_cgpa, sem3_cgpa, sem4_cgpa, sem5_cgpa, sem6_cgpa, ogpa, photo_url, photo_data, grade, result_status "
                              + "FROM sms_students ORDER BY student_id")) {
             boolean first = true;
             while (rs.next()) {
@@ -465,6 +481,12 @@ public class WebServer {
                         .append("\"studentStatus\":\"").append(escapeJson(rs.getString("student_status"))).append("\",")
                         .append("\"backPapers\":").append(rs.getInt("back_papers")).append(",")
                         .append("\"cgpa\":\"").append(escapeJson(getOptionalNumber(rs, "cgpa"))).append("\",")
+                        .append("\"sem1Cgpa\":\"").append(escapeJson(getOptionalNumber(rs, "sem1_cgpa"))).append("\",")
+                        .append("\"sem2Cgpa\":\"").append(escapeJson(getOptionalNumber(rs, "sem2_cgpa"))).append("\",")
+                        .append("\"sem3Cgpa\":\"").append(escapeJson(getOptionalNumber(rs, "sem3_cgpa"))).append("\",")
+                        .append("\"sem4Cgpa\":\"").append(escapeJson(getOptionalNumber(rs, "sem4_cgpa"))).append("\",")
+                        .append("\"sem5Cgpa\":\"").append(escapeJson(getOptionalNumber(rs, "sem5_cgpa"))).append("\",")
+                        .append("\"sem6Cgpa\":\"").append(escapeJson(getOptionalNumber(rs, "sem6_cgpa"))).append("\",")
                         .append("\"ogpa\":\"").append(escapeJson(getOptionalNumber(rs, "ogpa"))).append("\",")
                         .append("\"photo\":\"").append(escapeJson(photo)).append("\",")
                         .append("\"grade\":\"").append(escapeJson(rs.getString("grade"))).append("\",")
@@ -487,7 +509,8 @@ public class WebServer {
                     form.get("email"), Integer.parseInt(form.get("courseStartYear")),
                     Integer.parseInt(form.get("passoutYear")), form.get("studentStatus"),
                     Integer.parseInt(form.get("backPapers")), blankToEmpty(form.get("cgpa")),
-                    blankToEmpty(form.get("ogpa")), blankToEmpty(form.get("photo")), "Not Added", "Pending"));
+                    "", "", "", "", "", "", blankToEmpty(form.get("ogpa")),
+                    blankToEmpty(form.get("photo")), "Not Added", "Pending"));
             return;
         }
 
@@ -661,6 +684,12 @@ public class WebServer {
         String grade = form.get("grade");
         String status = grade.equalsIgnoreCase("F") ? "Fail" : "Pass";
         validateOptionalPointAverage(form.get("cgpa"));
+        validateOptionalPointAverage(form.get("sem1Cgpa"));
+        validateOptionalPointAverage(form.get("sem2Cgpa"));
+        validateOptionalPointAverage(form.get("sem3Cgpa"));
+        validateOptionalPointAverage(form.get("sem4Cgpa"));
+        validateOptionalPointAverage(form.get("sem5Cgpa"));
+        validateOptionalPointAverage(form.get("sem6Cgpa"));
         validateOptionalPointAverage(form.get("ogpa"));
 
         if (demoMode) {
@@ -671,6 +700,24 @@ public class WebServer {
                 if (!isBlank(form.get("cgpa"))) {
                     student.cgpa = form.get("cgpa");
                 }
+                if (!isBlank(form.get("sem1Cgpa"))) {
+                    student.sem1Cgpa = form.get("sem1Cgpa");
+                }
+                if (!isBlank(form.get("sem2Cgpa"))) {
+                    student.sem2Cgpa = form.get("sem2Cgpa");
+                }
+                if (!isBlank(form.get("sem3Cgpa"))) {
+                    student.sem3Cgpa = form.get("sem3Cgpa");
+                }
+                if (!isBlank(form.get("sem4Cgpa"))) {
+                    student.sem4Cgpa = form.get("sem4Cgpa");
+                }
+                if (!isBlank(form.get("sem5Cgpa"))) {
+                    student.sem5Cgpa = form.get("sem5Cgpa");
+                }
+                if (!isBlank(form.get("sem6Cgpa"))) {
+                    student.sem6Cgpa = form.get("sem6Cgpa");
+                }
                 if (!isBlank(form.get("ogpa"))) {
                     student.ogpa = form.get("ogpa");
                 }
@@ -680,12 +727,22 @@ public class WebServer {
 
         try (Connection con = DatabaseConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(
-                     "UPDATE sms_students SET grade = ?, result_status = ?, cgpa = NVL(?, cgpa), ogpa = NVL(?, ogpa) WHERE student_id = ?")) {
+                     "UPDATE sms_students SET grade = ?, result_status = ?, cgpa = NVL(?, cgpa), "
+                             + "sem1_cgpa = NVL(?, sem1_cgpa), sem2_cgpa = NVL(?, sem2_cgpa), "
+                             + "sem3_cgpa = NVL(?, sem3_cgpa), sem4_cgpa = NVL(?, sem4_cgpa), "
+                             + "sem5_cgpa = NVL(?, sem5_cgpa), sem6_cgpa = NVL(?, sem6_cgpa), "
+                             + "ogpa = NVL(?, ogpa) WHERE student_id = ?")) {
             ps.setString(1, grade);
             ps.setString(2, status);
             setOptionalDouble(ps, 3, form.get("cgpa"));
-            setOptionalDouble(ps, 4, form.get("ogpa"));
-            ps.setInt(5, id);
+            setOptionalDouble(ps, 4, form.get("sem1Cgpa"));
+            setOptionalDouble(ps, 5, form.get("sem2Cgpa"));
+            setOptionalDouble(ps, 6, form.get("sem3Cgpa"));
+            setOptionalDouble(ps, 7, form.get("sem4Cgpa"));
+            setOptionalDouble(ps, 8, form.get("sem5Cgpa"));
+            setOptionalDouble(ps, 9, form.get("sem6Cgpa"));
+            setOptionalDouble(ps, 10, form.get("ogpa"));
+            ps.setInt(11, id);
             ps.executeUpdate();
         }
     }
@@ -754,6 +811,12 @@ public class WebServer {
         private String studentStatus;
         private int backPapers;
         private String cgpa;
+        private String sem1Cgpa;
+        private String sem2Cgpa;
+        private String sem3Cgpa;
+        private String sem4Cgpa;
+        private String sem5Cgpa;
+        private String sem6Cgpa;
         private String ogpa;
         private String photo;
         private String grade;
@@ -761,7 +824,9 @@ public class WebServer {
 
         StudentRecord(int id, String regNo, String name, String phone, String department, int semester,
                       String email, int courseStartYear, int passoutYear, String studentStatus,
-                      int backPapers, String cgpa, String ogpa, String photo, String grade, String status) {
+                      int backPapers, String cgpa, String sem1Cgpa, String sem2Cgpa, String sem3Cgpa,
+                      String sem4Cgpa, String sem5Cgpa, String sem6Cgpa, String ogpa, String photo,
+                      String grade, String status) {
             this.id = id;
             this.regNo = regNo;
             this.name = name;
@@ -774,6 +839,12 @@ public class WebServer {
             this.studentStatus = studentStatus;
             this.backPapers = backPapers;
             this.cgpa = cgpa;
+            this.sem1Cgpa = sem1Cgpa;
+            this.sem2Cgpa = sem2Cgpa;
+            this.sem3Cgpa = sem3Cgpa;
+            this.sem4Cgpa = sem4Cgpa;
+            this.sem5Cgpa = sem5Cgpa;
+            this.sem6Cgpa = sem6Cgpa;
             this.ogpa = ogpa;
             this.photo = photo;
             this.grade = grade;
@@ -794,6 +865,12 @@ public class WebServer {
                     + "\"studentStatus\":\"" + escapeJson(studentStatus) + "\","
                     + "\"backPapers\":" + backPapers + ","
                     + "\"cgpa\":\"" + escapeJson(cgpa) + "\","
+                    + "\"sem1Cgpa\":\"" + escapeJson(sem1Cgpa) + "\","
+                    + "\"sem2Cgpa\":\"" + escapeJson(sem2Cgpa) + "\","
+                    + "\"sem3Cgpa\":\"" + escapeJson(sem3Cgpa) + "\","
+                    + "\"sem4Cgpa\":\"" + escapeJson(sem4Cgpa) + "\","
+                    + "\"sem5Cgpa\":\"" + escapeJson(sem5Cgpa) + "\","
+                    + "\"sem6Cgpa\":\"" + escapeJson(sem6Cgpa) + "\","
                     + "\"ogpa\":\"" + escapeJson(ogpa) + "\","
                     + "\"photo\":\"" + escapeJson(photo) + "\","
                     + "\"grade\":\"" + escapeJson(grade) + "\","
