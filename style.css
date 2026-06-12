@@ -79,7 +79,7 @@ input, select {
 button {
     margin-top: 14px;
     padding: 11px 16px;
-    border: 0;
+    border: 2px solid transparent;
     border-radius: 6px;
     color: white;
     background: #2563eb;
@@ -103,6 +103,34 @@ button:hover {
 
 .compact {
     margin-top: 0;
+}
+
+.module-button,
+.submodule-button {
+    box-shadow: none;
+}
+
+.active-module {
+    border-color: #111827;
+    color: #ffffff;
+    background: #111827;
+    box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.16);
+}
+
+.active-module:hover {
+    background: #111827;
+}
+
+.active-submodule {
+    border-color: #111827;
+    color: #111827;
+    background: #eef2f6;
+    box-shadow: 0 0 0 2px rgba(17, 24, 39, 0.12);
+}
+
+.active-submodule:hover {
+    color: #111827;
+    background: #e5eaf0;
 }
 
 .message {
@@ -200,6 +228,14 @@ th {
     color: #52606d;
     background: #e5eaf0;
     font-size: 12px;
+}
+
+.avatar-placeholder {
+    border: 2px solid #111827;
+    color: #ffffff;
+    background: #2563eb;
+    font-size: 15px;
+    font-weight: bold;
 }
 
 .photo-upload {

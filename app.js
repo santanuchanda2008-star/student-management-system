@@ -5,8 +5,8 @@ const defaultStudents = [
 ];
 
 const usesServer = window.location.protocol !== "file:";
-let students = usesServer ? [] : loadStudents();
-let nextStudentId = usesServer ? 4 : loadNextStudentId();
+let students = loadStudents();
+let nextStudentId = loadNextStudentId();
 let users = usesServer ? [] : loadUsers();
 let currentRole = "";
 let selectedGradeStatus = "Studying";
@@ -32,10 +32,6 @@ function loadNextStudentId() {
 }
 
 function saveData() {
-    if (usesServer) {
-        return;
-    }
-
     localStorage.setItem("students", JSON.stringify(students));
     localStorage.setItem("nextStudentId", String(nextStudentId));
 }
@@ -252,8 +248,25 @@ async function showDashboard() {
 }
 
 async function fetchStudents() {
+    const savedStudents = localStorage.getItem("students");
+    if (savedStudents) {
+        students = JSON.parse(savedStudents);
+        nextStudentId = Math.max(loadNextStudentId(), getNextStudentIdFromStudents());
+        return;
+    }
+
     const response = await fetch("/api/students");
     students = await response.json();
+    nextStudentId = getNextStudentIdFromStudents();
+    saveData();
+}
+
+function getNextStudentIdFromStudents() {
+    if (students.length === 0) {
+        return 1;
+    }
+
+    return Math.max(...students.map(student => Number(student.id) || 0)) + 1;
 }
 
 function logout() {
@@ -279,7 +292,7 @@ function renderStudents(list = students) {
     list.forEach(student => {
         const photoCell = student.photo
             ? `<img class="student-photo" src="${student.photo}" alt="${student.name}">`
-            : `<div class="photo-placeholder">No Photo</div>`;
+            : `<div class="photo-placeholder avatar-placeholder">${getStudentInitials(student.name)}</div>`;
 
         const infoRowHtml = `
             <td>${student.id}</td>
@@ -347,6 +360,8 @@ function renderStudents(list = students) {
 
 function showStudentInformation() {
     hideForms();
+    setActiveMainModule("studentInfoMenuButton");
+    clearActiveSubModules();
     document.getElementById("studentInfoSection").classList.remove("hidden");
     document.getElementById("academicResultSection").classList.add("hidden");
     document.getElementById("addStudentSection").classList.add("hidden");
@@ -356,6 +371,8 @@ function showStudentInformation() {
 
 function showAcademicResults() {
     hideForms();
+    setActiveMainModule("academicResultMenuButton");
+    clearActiveSubModules();
     document.getElementById("studentInfoSection").classList.add("hidden");
     document.getElementById("academicResultSection").classList.remove("hidden");
     document.getElementById("addStudentSection").classList.add("hidden");
@@ -365,6 +382,8 @@ function showAcademicResults() {
 
 function showAddStudentOptions() {
     hideForms();
+    setActiveMainModule("addStudentMenuButton");
+    clearActiveSubModules();
     document.getElementById("studentInfoSection").classList.add("hidden");
     document.getElementById("academicResultSection").classList.add("hidden");
     document.getElementById("modifyGradeSection").classList.add("hidden");
@@ -373,6 +392,8 @@ function showAddStudentOptions() {
 
 function showModifyGradeOptions() {
     hideForms();
+    setActiveMainModule("modifyGradeMenuButton");
+    clearActiveSubModules();
     document.getElementById("studentInfoSection").classList.add("hidden");
     document.getElementById("academicResultSection").classList.add("hidden");
     document.getElementById("addStudentSection").classList.add("hidden");
@@ -380,23 +401,45 @@ function showModifyGradeOptions() {
 }
 
 function showStudyingStudentInformation() {
+    setActiveSubModule("infoStudyingButton");
     document.getElementById("studyingInfoSection").classList.remove("hidden");
     document.getElementById("passedOutInfoSection").classList.add("hidden");
 }
 
 function showPassedOutStudentInformation() {
+    setActiveSubModule("infoPassedOutButton");
     document.getElementById("studyingInfoSection").classList.add("hidden");
     document.getElementById("passedOutInfoSection").classList.remove("hidden");
 }
 
 function showStudyingAcademicResults() {
+    setActiveSubModule("academicStudyingButton");
     document.getElementById("studyingAcademicSection").classList.remove("hidden");
     document.getElementById("passedOutAcademicSection").classList.add("hidden");
 }
 
 function showPassedOutAcademicResults() {
+    setActiveSubModule("academicPassedOutButton");
     document.getElementById("studyingAcademicSection").classList.add("hidden");
     document.getElementById("passedOutAcademicSection").classList.remove("hidden");
+}
+
+function setActiveMainModule(activeButtonId) {
+    document.querySelectorAll(".module-button").forEach(button => {
+        button.classList.toggle("active-module", button.id === activeButtonId);
+    });
+}
+
+function setActiveSubModule(activeButtonId) {
+    document.querySelectorAll(".submodule-button").forEach(button => {
+        button.classList.toggle("active-submodule", button.id === activeButtonId);
+    });
+}
+
+function clearActiveSubModules() {
+    document.querySelectorAll(".submodule-button").forEach(button => {
+        button.classList.remove("active-submodule");
+    });
 }
 
 function getCourseDuration(student) {
@@ -405,6 +448,15 @@ function getCourseDuration(student) {
     }
 
     return `${student.courseStartYear || ""} - ${student.passoutYear || ""}`;
+}
+
+function getStudentInitials(name) {
+    return String(name || "Student")
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map(part => part.charAt(0).toUpperCase())
+        .join("");
 }
 
 function searchStudents() {
@@ -429,6 +481,8 @@ function searchStudents() {
 
 function showAddStudentForm(status = "Studying") {
     hideForms();
+    setActiveMainModule("addStudentMenuButton");
+    setActiveSubModule(status === "Passed Out" ? "addPassedOutButton" : "addStudyingButton");
     document.getElementById("addStudentSection").classList.remove("hidden");
     document.getElementById("studentForm").classList.remove("hidden");
     document.getElementById("editStudentId").value = "";
@@ -502,6 +556,21 @@ async function saveStudent() {
         return;
     }
 
+    if (!isNonNegativeWholeNumber(courseStartYear) || !isNonNegativeWholeNumber(passoutYear)) {
+        alert("Course start year and pass out year cannot be negative.");
+        return;
+    }
+
+    const duplicateRegistration = students.some(student =>
+        student.regNo.toLowerCase() === regNo.toLowerCase()
+        && String(student.id) !== String(editId)
+    );
+
+    if (duplicateRegistration) {
+        alert("Registration number already exists. Please enter a unique registration number.");
+        return;
+    }
+
     if (cgpa && !isValidPointAverage(cgpa)) {
         alert("CGPA should be between 0 and 10.");
         return;
@@ -511,6 +580,22 @@ async function saveStudent() {
         alert("OGPA should be between 0 and 10.");
         return;
     }
+
+    const studentData = {
+        regNo: regNo,
+        name: name,
+        phone: phone,
+        department: department,
+        semester: Number(semester),
+        email: email,
+        courseStartYear: Number(courseStartYear),
+        passoutYear: Number(passoutYear),
+        backPapers: Number(backPapers),
+        cgpa: cgpa,
+        ogpa: ogpa,
+        studentStatus: studentStatus,
+        photo: photo
+    };
 
     if (usesServer) {
         const formData = new URLSearchParams({
@@ -531,51 +616,37 @@ async function saveStudent() {
         const url = editId ? "/api/students/" + editId : "/api/students";
         const method = editId ? "PUT" : "POST";
 
-        await fetch(url, { method: method, body: formData });
-        await fetchStudents();
+        const response = await fetch(url, { method: method, body: formData });
+        const result = await response.json();
+        if (!result.success) {
+            alert(result.message || "Student could not be saved.");
+            return;
+        }
+        applyStudentChange(editId, studentData);
+        saveData();
         renderStudents();
         return;
     }
 
-    if (editId) {
-        const student = students.find(item => item.id === Number(editId));
-        student.regNo = regNo;
-        student.name = name;
-        student.phone = phone;
-        student.department = department;
-        student.semester = Number(semester);
-        student.email = email;
-        student.courseStartYear = Number(courseStartYear);
-        student.passoutYear = Number(passoutYear);
-        student.backPapers = Number(backPapers);
-        student.cgpa = cgpa;
-        student.ogpa = ogpa;
-        student.studentStatus = studentStatus;
-        student.photo = photo;
-    } else {
-        students.push({
-            id: nextStudentId,
-            regNo: regNo,
-            name: name,
-            phone: phone,
-            department: department,
-            semester: Number(semester),
-            email: email,
-            courseStartYear: Number(courseStartYear),
-            passoutYear: Number(passoutYear),
-            backPapers: Number(backPapers),
-            cgpa: cgpa,
-            ogpa: ogpa,
-            studentStatus: studentStatus,
-            photo: photo,
-            grade: "Not Added",
-            status: "Pending"
-        });
-        nextStudentId++;
-    }
-
+    applyStudentChange(editId, studentData);
     saveData();
     renderStudents();
+}
+
+function applyStudentChange(editId, studentData) {
+    if (editId) {
+        const student = students.find(item => item.id === Number(editId));
+        Object.assign(student, studentData);
+        return;
+    }
+
+    students.push({
+        id: nextStudentId,
+        ...studentData,
+        grade: "Not Added",
+        status: "Pending"
+    });
+    nextStudentId++;
 }
 
 function editStudent(id) {
@@ -634,9 +705,30 @@ function cleanSemesterInput() {
     semesterInput.value = semesterInput.value.replace(/\D/g, "").slice(0, 1);
 }
 
+function cleanWholeNumberInput(inputId) {
+    const input = document.getElementById(inputId);
+    input.value = input.value.replace(/\D/g, "");
+}
+
+function cleanPointAverageInput(inputId) {
+    const input = document.getElementById(inputId);
+    let value = input.value.replace(/[^0-9.]/g, "");
+    const firstDotIndex = value.indexOf(".");
+
+    if (firstDotIndex !== -1) {
+        value = value.slice(0, firstDotIndex + 1) + value.slice(firstDotIndex + 1).replace(/\./g, "");
+    }
+
+    input.value = value;
+}
+
 function isValidPointAverage(value) {
     const number = Number(value);
     return !Number.isNaN(number) && number >= 0 && number <= 10;
+}
+
+function isNonNegativeWholeNumber(value) {
+    return /^[0-9]+$/.test(String(value));
 }
 
 async function previewSelectedPhoto() {
@@ -706,7 +798,8 @@ function resizePhoto(file) {
 async function deleteStudent(id) {
     if (usesServer) {
         await fetch("/api/students/" + id, { method: "DELETE" });
-        await fetchStudents();
+        students = students.filter(student => student.id !== id);
+        saveData();
         renderStudents();
         return;
     }
@@ -718,6 +811,8 @@ async function deleteStudent(id) {
 
 function showGradeForm(status = "Studying") {
     hideForms();
+    setActiveMainModule("modifyGradeMenuButton");
+    setActiveSubModule(status === "Passed Out" ? "gradePassedOutButton" : "gradeStudyingButton");
     selectedGradeStatus = status;
     document.getElementById("modifyGradeSection").classList.remove("hidden");
     document.getElementById("gradeForm").classList.remove("hidden");
@@ -736,7 +831,7 @@ async function saveGrade() {
     const ogpa = document.getElementById("gradeOgpa").value.trim();
     const student = students.find(item => item.id === studentId);
 
-    if (!student || !grade) {
+    if (!Number.isInteger(studentId) || studentId < 1 || !student || !grade) {
         alert("Please enter a valid student ID and grade.");
         return;
     }
@@ -761,11 +856,18 @@ async function saveGrade() {
             method: "PUT",
             body: new URLSearchParams({ grade: grade, cgpa: cgpa, ogpa: ogpa })
         });
-        await fetchStudents();
+        applyGradeChange(student, grade, cgpa, ogpa);
+        saveData();
         renderStudents();
         return;
     }
 
+    applyGradeChange(student, grade, cgpa, ogpa);
+    saveData();
+    renderStudents();
+}
+
+function applyGradeChange(student, grade, cgpa, ogpa) {
     student.grade = grade;
     if ((student.studentStatus || "Studying") === "Studying") {
         student.cgpa = cgpa;
@@ -773,8 +875,6 @@ async function saveGrade() {
         student.ogpa = ogpa;
     }
     student.status = grade === "F" ? "Fail" : "Pass";
-    saveData();
-    renderStudents();
 }
 
 function hideForms() {
