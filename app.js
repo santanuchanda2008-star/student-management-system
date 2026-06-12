@@ -1,7 +1,7 @@
 const defaultStudents = [
-    { id: 1, regNo: "REG101", name: "Rahul Sharma", phone: "9876543210", department: "Computer", semester: 3, email: "rahul@example.com", photo: "", courseStartYear: 2024, passoutYear: 2027, studentStatus: "Studying", backPapers: 0, cgpa: 8.2, ogpa: "", grade: "A", status: "Pass" },
-    { id: 2, regNo: "REG102", name: "Priya Kumari", phone: "9876501234", department: "Electrical", semester: 4, email: "priya@example.com", photo: "", courseStartYear: 2023, passoutYear: 2026, studentStatus: "Studying", backPapers: 0, cgpa: 7.8, ogpa: "", grade: "B", status: "Pass" },
-    { id: 3, regNo: "REG103", name: "Amit Verma", phone: "9876512345", department: "Mechanical", semester: 2, email: "amit@example.com", photo: "", courseStartYear: 2025, passoutYear: 2028, studentStatus: "Studying", backPapers: 0, cgpa: "", ogpa: "", grade: "Not Added", status: "Pending" }
+    { id: 1, regNo: "REG101", name: "Rahul Sharma", phone: "9876543210", department: "Computer", semester: 3, email: "rahul@gmail.com", photo: "", courseStartYear: 2024, passoutYear: 2027, studentStatus: "Studying", backPapers: 0, cgpa: 8.2, ogpa: "", grade: "A", status: "Pass" },
+    { id: 2, regNo: "REG102", name: "Priya Kumari", phone: "9876501234", department: "Electrical", semester: 4, email: "priya@yahoo.com", photo: "", courseStartYear: 2023, passoutYear: 2026, studentStatus: "Studying", backPapers: 0, cgpa: 7.8, ogpa: "", grade: "B", status: "Pass" },
+    { id: 3, regNo: "REG103", name: "Amit Verma", phone: "9876512345", department: "Mechanical", semester: 2, email: "amit@outlook.com", photo: "", courseStartYear: 2025, passoutYear: 2028, studentStatus: "Studying", backPapers: 0, cgpa: "", ogpa: "", grade: "Not Added", status: "Pending" }
 ];
 
 const usesServer = window.location.protocol !== "file:";
@@ -10,6 +10,7 @@ let nextStudentId = loadNextStudentId();
 let users = usesServer ? [] : loadUsers();
 let currentRole = "";
 let selectedGradeStatus = "Studying";
+let presentationDataLoaded = false;
 
 function loadStudents() {
     const savedStudents = localStorage.getItem("students");
@@ -34,6 +35,29 @@ function loadNextStudentId() {
 function saveData() {
     localStorage.setItem("students", JSON.stringify(students));
     localStorage.setItem("nextStudentId", String(nextStudentId));
+}
+
+async function loadPresentationData() {
+    if (presentationDataLoaded) {
+        return;
+    }
+
+    try {
+        const response = await fetch("presentation-data.json?time=" + Date.now());
+        if (!response.ok) {
+            return;
+        }
+
+        const data = await response.json();
+        if (Array.isArray(data.students) && data.students.length > 0) {
+            students = data.students;
+            nextStudentId = getNextStudentIdFromStudents();
+            saveData();
+            presentationDataLoaded = true;
+        }
+    } catch (error) {
+        presentationDataLoaded = true;
+    }
 }
 
 function loadUsers() {
@@ -118,6 +142,12 @@ async function createAccount() {
 
     if (!username || !password) {
         message.textContent = "Please enter username and password.";
+        return;
+    }
+
+    if (username.toLowerCase() === "admin") {
+        message.style.color = "#b42318";
+        message.textContent = "Admin account is fixed. Please create a user account with another username.";
         return;
     }
 
@@ -239,7 +269,9 @@ async function showDashboard() {
     document.getElementById("passedInfoActionHeader").classList.toggle("hidden", currentRole !== "admin");
     hideForms();
 
-    if (usesServer) {
+    await loadPresentationData();
+
+    if (usesServer && !presentationDataLoaded) {
         await fetchStudents();
     }
 
@@ -312,6 +344,23 @@ function renderStudents(list = students) {
             </td>
         `;
 
+        const passedInfoRowHtml = `
+            <td>${student.id}</td>
+            <td>${photoCell}</td>
+            <td>${student.name}</td>
+            <td>${student.regNo}</td>
+            <td>${student.phone || ""}</td>
+            <td>${student.email || ""}</td>
+            <td>${getCourseDuration(student)}</td>
+            <td>${student.studentStatus || "Passed Out"}</td>
+            <td class="${currentRole !== "admin" ? "hidden" : ""}">
+                <div class="action-buttons">
+                    <button onclick="editStudent(${student.id})">Edit</button>
+                    <button class="danger" onclick="deleteStudent(${student.id})">Delete</button>
+                </div>
+            </td>
+        `;
+
         const infoRow = document.createElement("tr");
         infoRow.innerHTML = infoRowHtml;
 
@@ -319,7 +368,7 @@ function renderStudents(list = students) {
             infoTable.appendChild(infoRow);
         } else {
             const passedInfoRow = document.createElement("tr");
-            passedInfoRow.innerHTML = infoRowHtml;
+            passedInfoRow.innerHTML = passedInfoRowHtml;
             passedOutInfoTable.appendChild(passedInfoRow);
         }
 
@@ -797,7 +846,12 @@ function resizePhoto(file) {
 
 async function deleteStudent(id) {
     if (usesServer) {
-        await fetch("/api/students/" + id, { method: "DELETE" });
+        const response = await fetch("/api/students/" + id, { method: "DELETE" });
+        const result = await response.json();
+        if (!result.success) {
+            alert(result.message || "Student could not be deleted.");
+            return;
+        }
         students = students.filter(student => student.id !== id);
         saveData();
         renderStudents();
@@ -852,10 +906,15 @@ async function saveGrade() {
     }
 
     if (usesServer) {
-        await fetch("/api/students/" + studentId + "/grade", {
+        const response = await fetch("/api/students/" + studentId + "/grade", {
             method: "PUT",
             body: new URLSearchParams({ grade: grade, cgpa: cgpa, ogpa: ogpa })
         });
+        const result = await response.json();
+        if (!result.success) {
+            alert(result.message || "Grade could not be saved.");
+            return;
+        }
         applyGradeChange(student, grade, cgpa, ogpa);
         saveData();
         renderStudents();

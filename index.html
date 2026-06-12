@@ -67,10 +67,10 @@
             </div>
 
             <div class="toolbar" id="dashboardTools">
-                <button onclick="showStudentInformation()">Student Information</button>
-                <button onclick="showAcademicResults()">Academic Result</button>
-                <button id="addStudentMenuButton" onclick="showAddStudentOptions()">Add Student</button>
-                <button id="modifyGradeMenuButton" onclick="showModifyGradeOptions()">Modify Grades</button>
+                <button id="studentInfoMenuButton" class="module-button" onclick="showStudentInformation()">Student Information</button>
+                <button id="academicResultMenuButton" class="module-button" onclick="showAcademicResults()">Academic Result</button>
+                <button id="addStudentMenuButton" class="module-button" onclick="showAddStudentOptions()">Add Student</button>
+                <button id="modifyGradeMenuButton" class="module-button" onclick="showModifyGradeOptions()">Modify Grades</button>
             </div>
 
             <div class="search-row">
@@ -82,8 +82,8 @@
             <div id="addStudentSection" class="hidden">
                 <h3 class="table-title">Add Student</h3>
                 <div class="toolbar">
-                    <button onclick="showAddStudentForm('Studying')">Students</button>
-                    <button onclick="showAddStudentForm('Passed Out')">Passed Out Students</button>
+                    <button id="addStudyingButton" class="submodule-button" onclick="showAddStudentForm('Studying')">Students</button>
+                    <button id="addPassedOutButton" class="submodule-button" onclick="showAddStudentForm('Passed Out')">Passed Out Students</button>
                 </div>
             </div>
 
@@ -95,11 +95,11 @@
                 <input type="text" id="department" placeholder="Department Name">
                 <input type="text" id="semester" placeholder="Semester" maxlength="1" inputmode="numeric" oninput="cleanSemesterInput()">
                 <input type="email" id="email" placeholder="Email">
-                <input type="number" id="courseStartYear" placeholder="Course Start Year">
-                <input type="number" id="passoutYear" placeholder="Pass Out Year">
-                <input type="number" id="backPapers" placeholder="Back Papers" min="0" step="1" value="0">
-                <input type="number" id="cgpa" placeholder="CGPA" min="0" max="10" step="0.01">
-                <input type="number" id="ogpa" placeholder="OGPA" min="0" max="10" step="0.01">
+                <input type="number" id="courseStartYear" placeholder="Course Start Year" min="0" oninput="cleanWholeNumberInput('courseStartYear')">
+                <input type="number" id="passoutYear" placeholder="Pass Out Year" min="0" oninput="cleanWholeNumberInput('passoutYear')">
+                <input type="number" id="backPapers" placeholder="Back Papers" min="0" step="1" value="0" oninput="cleanWholeNumberInput('backPapers')">
+                <input type="number" id="cgpa" placeholder="CGPA" min="0" max="10" step="0.01" oninput="cleanPointAverageInput('cgpa')">
+                <input type="number" id="ogpa" placeholder="OGPA" min="0" max="10" step="0.01" oninput="cleanPointAverageInput('ogpa')">
                 <select id="studentStatus" onchange="handleStudentStatusChange()">
                     <option value="Studying">Studying</option>
                     <option value="Passed Out">Passed Out</option>
@@ -116,13 +116,13 @@
             <div id="modifyGradeSection" class="hidden">
                 <h3 class="table-title">Modify Grades</h3>
                 <div class="toolbar">
-                    <button onclick="showGradeForm('Studying')">Students</button>
-                    <button onclick="showGradeForm('Passed Out')">Passed Out Students</button>
+                    <button id="gradeStudyingButton" class="submodule-button" onclick="showGradeForm('Studying')">Students</button>
+                    <button id="gradePassedOutButton" class="submodule-button" onclick="showGradeForm('Passed Out')">Passed Out Students</button>
                 </div>
             </div>
 
             <form class="form-grid hidden" id="gradeForm">
-                <input type="number" id="gradeStudentId" placeholder="Student ID">
+                <input type="number" id="gradeStudentId" placeholder="Student ID" min="1" oninput="cleanWholeNumberInput('gradeStudentId')">
                 <select id="grade">
                     <option value="">Select Grade</option>
                     <option value="A">A</option>
@@ -131,16 +131,16 @@
                     <option value="D">D</option>
                     <option value="F">F</option>
                 </select>
-                <input type="number" id="gradeCgpa" placeholder="CGPA for studying student" min="0" max="10" step="0.01">
-                <input type="number" id="gradeOgpa" placeholder="OGPA for passed out student" min="0" max="10" step="0.01">
+                <input type="number" id="gradeCgpa" placeholder="CGPA for studying student" min="0" max="10" step="0.01" oninput="cleanPointAverageInput('gradeCgpa')">
+                <input type="number" id="gradeOgpa" placeholder="OGPA for passed out student" min="0" max="10" step="0.01" oninput="cleanPointAverageInput('gradeOgpa')">
                 <button type="button" onclick="saveGrade()">Save Grade</button>
             </form>
 
             <div id="studentInfoSection">
                 <h3 class="table-title">Student Information</h3>
                 <div class="toolbar">
-                    <button onclick="showStudyingStudentInformation()">Students</button>
-                    <button onclick="showPassedOutStudentInformation()">Passed Out Students</button>
+                    <button id="infoStudyingButton" class="submodule-button" onclick="showStudyingStudentInformation()">Students</button>
+                    <button id="infoPassedOutButton" class="submodule-button" onclick="showPassedOutStudentInformation()">Passed Out Students</button>
                 </div>
 
                 <div id="studyingInfoSection" class="table-wrap">
@@ -152,7 +152,6 @@
                                 <th>Name</th>
                                 <th>Registration Number</th>
                                 <th>Phone Number</th>
-                                <th>Semester</th>
                                 <th>Email</th>
                                 <th>Course Duration</th>
                                 <th>Status</th>
@@ -187,8 +186,8 @@
             <div id="academicResultSection" class="hidden">
                 <h3 class="table-title">Academic Results</h3>
                 <div class="toolbar">
-                    <button onclick="showStudyingAcademicResults()">Students</button>
-                    <button onclick="showPassedOutAcademicResults()">Passed Out Students</button>
+                    <button id="academicStudyingButton" class="submodule-button" onclick="showStudyingAcademicResults()">Students</button>
+                    <button id="academicPassedOutButton" class="submodule-button" onclick="showPassedOutAcademicResults()">Passed Out Students</button>
                 </div>
 
                 <div id="studyingAcademicSection" class="table-wrap">

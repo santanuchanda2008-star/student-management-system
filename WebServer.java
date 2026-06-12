@@ -216,11 +216,11 @@ public class WebServer {
                         + "(student_id, registration_number, student_name, phone_number, department_name, semester, email, course_start_year, passout_year, student_status, back_papers, cgpa, ogpa, photo_url, grade, result_status) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")) {
             insertStudent(ps, 1, "REG101", "Rahul Sharma", "9876543210", "Computer", 3,
-                    "rahul@example.com", 2024, 2027, "Studying", 0, "8.2", "", "", "A", "Pass");
+                    "rahul@gmail.com", 2024, 2027, "Studying", 0, "8.2", "", "", "A", "Pass");
             insertStudent(ps, 2, "REG102", "Priya Kumari", "9876501234", "Electrical", 4,
-                    "priya@example.com", 2023, 2026, "Studying", 0, "7.8", "", "", "B", "Pass");
+                    "priya@yahoo.com", 2023, 2026, "Studying", 0, "7.8", "", "", "B", "Pass");
             insertStudent(ps, 3, "REG103", "Amit Verma", "9876512345", "Mechanical", 2,
-                    "amit@example.com", 2025, 2028, "Studying", 0, "", "", "", "Not Added", "Pending");
+                    "amit@outlook.com", 2025, 2028, "Studying", 0, "", "", "", "Not Added", "Pending");
         }
     }
 
@@ -291,7 +291,7 @@ public class WebServer {
                     }
                 }
             } catch (SQLException e) {
-                send(exchange, 500, "{\"success\":false,\"message\":\"Database error\"}");
+                send(exchange, 200, "{\"success\":false,\"message\":\"" + escapeJson(e.getMessage()) + "\"}");
             }
         }
     }
@@ -313,7 +313,7 @@ public class WebServer {
             }
 
             if (demoMode) {
-                if (username.equals("Admin")) {
+                if (username.equalsIgnoreCase("admin")) {
                     send(exchange, 200, "{\"success\":false,\"message\":\"Admin account is already fixed\"}");
                 } else if (demoPasswords.containsKey(username)) {
                     send(exchange, 200, "{\"success\":false,\"message\":\"Username already exists\"}");
@@ -322,6 +322,11 @@ public class WebServer {
                     demoRoles.put(username, "user");
                     send(exchange, 200, "{\"success\":true}");
                 }
+                return;
+            }
+
+            if (username.equalsIgnoreCase("admin")) {
+                send(exchange, 200, "{\"success\":false,\"message\":\"Admin account is already fixed\"}");
                 return;
             }
 
@@ -359,7 +364,7 @@ public class WebServer {
                 return;
             }
 
-            if (username.equals("Admin")) {
+            if (username.equalsIgnoreCase("admin")) {
                 send(exchange, 200, "{\"success\":false,\"message\":\"Admin password cannot be changed\"}");
                 return;
             }
@@ -387,7 +392,7 @@ public class WebServer {
                     send(exchange, 200, "{\"success\":true}");
                 }
             } catch (SQLException e) {
-                send(exchange, 500, "{\"success\":false,\"message\":\"Database error\"}");
+                send(exchange, 200, "{\"success\":false,\"message\":\"" + escapeJson(e.getMessage()) + "\"}");
             }
         }
     }
@@ -397,13 +402,13 @@ public class WebServer {
             String method = exchange.getRequestMethod();
             String path = exchange.getRequestURI().getPath();
 
-        try {
-            if (method.equalsIgnoreCase("GET") && path.equals("/api/students")) {
-                send(exchange, 200, getStudentsJson());
-            } else if (method.equalsIgnoreCase("POST") && path.equals("/api/students")) {
+            try {
+                if (method.equalsIgnoreCase("GET") && path.equals("/api/students")) {
+                    send(exchange, 200, getStudentsJson());
+                } else if (method.equalsIgnoreCase("POST") && path.equals("/api/students")) {
                     addStudent(readForm(exchange));
                     send(exchange, 200, "{\"success\":true}");
-            } else if (method.equalsIgnoreCase("PUT") && path.matches("/api/students/[0-9]+")) {
+                } else if (method.equalsIgnoreCase("PUT") && path.matches("/api/students/[0-9]+")) {
                     int id = getIdFromPath(path);
                     updateStudent(id, readForm(exchange));
                     send(exchange, 200, "{\"success\":true}");
@@ -419,7 +424,7 @@ public class WebServer {
                     send(exchange, 404, "{\"success\":false}");
                 }
             } catch (SQLException e) {
-                send(exchange, 500, "{\"success\":false,\"message\":\"Database error\"}");
+                send(exchange, 200, "{\"success\":false,\"message\":\"" + escapeJson(e.getMessage()) + "\"}");
             }
         }
     }
@@ -474,6 +479,7 @@ public class WebServer {
 
     private static void addStudent(Map<String, String> form) throws SQLException {
         validateStudentForm(form);
+        ensureUniqueRegistrationNumber(form.get("regNo"), 0);
 
         if (demoMode) {
             demoStudents.add(new StudentRecord(nextDemoStudentId(), form.get("regNo"), form.get("name"),
@@ -509,6 +515,7 @@ public class WebServer {
 
     private static void updateStudent(int id, Map<String, String> form) throws SQLException {
         validateStudentForm(form);
+        ensureUniqueRegistrationNumber(form.get("regNo"), id);
 
         if (demoMode) {
             StudentRecord student = findDemoStudent(id);
@@ -559,6 +566,8 @@ public class WebServer {
         String name = form.get("name");
         String semester = form.get("semester");
         String email = form.get("email");
+        String courseStartYear = form.get("courseStartYear");
+        String passoutYear = form.get("passoutYear");
 
         if (phone == null || !phone.matches("[0-9]{1,10}")) {
             throw new SQLException("Invalid phone number");
@@ -580,8 +589,41 @@ public class WebServer {
             throw new SQLException("Invalid back papers");
         }
 
+        if (courseStartYear == null || !courseStartYear.matches("[0-9]+")
+                || passoutYear == null || !passoutYear.matches("[0-9]+")) {
+            throw new SQLException("Course years cannot be negative");
+        }
+
         validateOptionalPointAverage(form.get("cgpa"));
         validateOptionalPointAverage(form.get("ogpa"));
+    }
+
+    private static void ensureUniqueRegistrationNumber(String regNo, int currentStudentId) throws SQLException {
+        if (isBlank(regNo)) {
+            throw new SQLException("Registration number is required");
+        }
+
+        if (demoMode) {
+            for (StudentRecord student : demoStudents) {
+                if (student.regNo.equalsIgnoreCase(regNo) && student.id != currentStudentId) {
+                    throw new SQLException("Registration number already exists");
+                }
+            }
+            return;
+        }
+
+        try (Connection con = DatabaseConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(
+                     "SELECT COUNT(*) FROM sms_students WHERE LOWER(registration_number) = LOWER(?) AND student_id <> ?")) {
+            ps.setString(1, regNo);
+            ps.setInt(2, currentStudentId);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                if (rs.getInt(1) > 0) {
+                    throw new SQLException("Registration number already exists");
+                }
+            }
+        }
     }
 
     private static void validateOptionalPointAverage(String value) throws SQLException {
