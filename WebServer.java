@@ -14,11 +14,17 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class WebServer {
     private static final int PORT = getPort();
+    private static boolean demoMode = false;
+    private static final Map<String, String> demoPasswords = new HashMap<String, String>();
+    private static final Map<String, String> demoRoles = new HashMap<String, String>();
+    private static final List<StudentRecord> demoStudents = new ArrayList<StudentRecord>();
 
     public static void main(String[] args) throws Exception {
         setupDatabase();
@@ -48,11 +54,39 @@ public class WebServer {
 
     private static void setupDatabase() throws SQLException {
         try (Connection con = DatabaseConnection.getConnection()) {
+            if (con == null) {
+                activateDemoMode();
+                return;
+            }
+
             createTables(con);
             ensureAdminAccount(con);
             insertDefaultUsers(con);
             insertDefaultStudents(con);
         }
+    }
+
+    private static void activateDemoMode() {
+        demoMode = true;
+        demoPasswords.clear();
+        demoRoles.clear();
+        demoStudents.clear();
+
+        demoPasswords.put("Admin", "Admin123");
+        demoRoles.put("Admin", "admin");
+        demoPasswords.put("user", "user123");
+        demoRoles.put("user", "user");
+
+        demoStudents.add(new StudentRecord(1, "REG101", "Rahul Sharma", "9876543210", "Computer",
+                3, "rahul@gmail.com", 2024, 2027, "Studying", 0, "8.2", "", "", "A", "Pass"));
+        demoStudents.add(new StudentRecord(2, "REG102", "Priya Kumari", "9876501234", "Electrical",
+                4, "priya@yahoo.com", 2023, 2026, "Studying", 0, "7.8", "", "", "B", "Pass"));
+        demoStudents.add(new StudentRecord(3, "REG103", "Amit Verma", "9876512345", "Mechanical",
+                2, "amit@outlook.com", 2025, 2028, "Studying", 1, "", "", "", "Not Added", "Pending"));
+        demoStudents.add(new StudentRecord(4, "REG090", "Neha Singh", "9876598765", "Computer",
+                6, "neha@gmail.com", 2021, 2024, "Passed Out", 0, "", "8.6", "", "A", "Pass"));
+
+        System.out.println("Oracle database is not available. Running in online demo mode.");
     }
 
     private static void createTables(Connection con) throws SQLException {
@@ -233,6 +267,16 @@ public class WebServer {
             String username = form.get("username");
             String password = form.get("password");
 
+            if (demoMode) {
+                String savedPassword = demoPasswords.get(username);
+                if (savedPassword != null && savedPassword.equals(password)) {
+                    send(exchange, 200, "{\"success\":true,\"role\":\"" + escapeJson(demoRoles.get(username)) + "\"}");
+                } else {
+                    send(exchange, 200, "{\"success\":false}");
+                }
+                return;
+            }
+
             try (Connection con = DatabaseConnection.getConnection();
                  PreparedStatement ps = con.prepareStatement(
                          "SELECT role FROM sms_users WHERE username = ? AND password = ?")) {
@@ -265,6 +309,19 @@ public class WebServer {
 
             if (isBlank(username) || isBlank(password)) {
                 send(exchange, 200, "{\"success\":false,\"message\":\"Please fill all account details\"}");
+                return;
+            }
+
+            if (demoMode) {
+                if (username.equals("Admin")) {
+                    send(exchange, 200, "{\"success\":false,\"message\":\"Admin account is already fixed\"}");
+                } else if (demoPasswords.containsKey(username)) {
+                    send(exchange, 200, "{\"success\":false,\"message\":\"Username already exists\"}");
+                } else {
+                    demoPasswords.put(username, password);
+                    demoRoles.put(username, "user");
+                    send(exchange, 200, "{\"success\":true}");
+                }
                 return;
             }
 
@@ -307,6 +364,16 @@ public class WebServer {
                 return;
             }
 
+            if (demoMode) {
+                if (!demoPasswords.containsKey(username)) {
+                    send(exchange, 200, "{\"success\":false,\"message\":\"Username not found\"}");
+                } else {
+                    demoPasswords.put(username, password);
+                    send(exchange, 200, "{\"success\":true}");
+                }
+                return;
+            }
+
             try (Connection con = DatabaseConnection.getConnection();
                  PreparedStatement ps = con.prepareStatement(
                          "UPDATE sms_users SET password = ? WHERE username = ?")) {
@@ -330,13 +397,13 @@ public class WebServer {
             String method = exchange.getRequestMethod();
             String path = exchange.getRequestURI().getPath();
 
-            try {
-                if (method.equalsIgnoreCase("GET") && path.equals("/api/students")) {
-                    send(exchange, 200, getStudentsJson());
-                } else if (method.equalsIgnoreCase("POST") && path.equals("/api/students")) {
+        try {
+            if (method.equalsIgnoreCase("GET") && path.equals("/api/students")) {
+                send(exchange, 200, getStudentsJson());
+            } else if (method.equalsIgnoreCase("POST") && path.equals("/api/students")) {
                     addStudent(readForm(exchange));
                     send(exchange, 200, "{\"success\":true}");
-                } else if (method.equalsIgnoreCase("PUT") && path.matches("/api/students/[0-9]+")) {
+            } else if (method.equalsIgnoreCase("PUT") && path.matches("/api/students/[0-9]+")) {
                     int id = getIdFromPath(path);
                     updateStudent(id, readForm(exchange));
                     send(exchange, 200, "{\"success\":true}");
@@ -358,6 +425,10 @@ public class WebServer {
     }
 
     private static String getStudentsJson() throws SQLException {
+        if (demoMode) {
+            return getDemoStudentsJson();
+        }
+
         StringBuilder json = new StringBuilder("[");
 
         try (Connection con = DatabaseConnection.getConnection();
@@ -404,6 +475,16 @@ public class WebServer {
     private static void addStudent(Map<String, String> form) throws SQLException {
         validateStudentForm(form);
 
+        if (demoMode) {
+            demoStudents.add(new StudentRecord(nextDemoStudentId(), form.get("regNo"), form.get("name"),
+                    form.get("phone"), form.get("department"), Integer.parseInt(form.get("semester")),
+                    form.get("email"), Integer.parseInt(form.get("courseStartYear")),
+                    Integer.parseInt(form.get("passoutYear")), form.get("studentStatus"),
+                    Integer.parseInt(form.get("backPapers")), blankToEmpty(form.get("cgpa")),
+                    blankToEmpty(form.get("ogpa")), blankToEmpty(form.get("photo")), "Not Added", "Pending"));
+            return;
+        }
+
         try (Connection con = DatabaseConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(
                      "INSERT INTO sms_students "
@@ -428,6 +509,26 @@ public class WebServer {
 
     private static void updateStudent(int id, Map<String, String> form) throws SQLException {
         validateStudentForm(form);
+
+        if (demoMode) {
+            StudentRecord student = findDemoStudent(id);
+            if (student != null) {
+                student.regNo = form.get("regNo");
+                student.name = form.get("name");
+                student.phone = form.get("phone");
+                student.department = form.get("department");
+                student.semester = Integer.parseInt(form.get("semester"));
+                student.email = form.get("email");
+                student.courseStartYear = Integer.parseInt(form.get("courseStartYear"));
+                student.passoutYear = Integer.parseInt(form.get("passoutYear"));
+                student.studentStatus = form.get("studentStatus");
+                student.backPapers = Integer.parseInt(form.get("backPapers"));
+                student.cgpa = blankToEmpty(form.get("cgpa"));
+                student.ogpa = blankToEmpty(form.get("ogpa"));
+                student.photo = blankToEmpty(form.get("photo"));
+            }
+            return;
+        }
 
         try (Connection con = DatabaseConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(
@@ -520,6 +621,21 @@ public class WebServer {
         validateOptionalPointAverage(form.get("cgpa"));
         validateOptionalPointAverage(form.get("ogpa"));
 
+        if (demoMode) {
+            StudentRecord student = findDemoStudent(id);
+            if (student != null) {
+                student.grade = grade;
+                student.status = status;
+                if (!isBlank(form.get("cgpa"))) {
+                    student.cgpa = form.get("cgpa");
+                }
+                if (!isBlank(form.get("ogpa"))) {
+                    student.ogpa = form.get("ogpa");
+                }
+            }
+            return;
+        }
+
         try (Connection con = DatabaseConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(
                      "UPDATE sms_students SET grade = ?, result_status = ?, cgpa = NVL(?, cgpa), ogpa = NVL(?, ogpa) WHERE student_id = ?")) {
@@ -533,10 +649,114 @@ public class WebServer {
     }
 
     private static void deleteStudent(int id) throws SQLException {
+        if (demoMode) {
+            StudentRecord student = findDemoStudent(id);
+            if (student != null) {
+                demoStudents.remove(student);
+            }
+            return;
+        }
+
         try (Connection con = DatabaseConnection.getConnection();
              PreparedStatement ps = con.prepareStatement("DELETE FROM sms_students WHERE student_id = ?")) {
             ps.setInt(1, id);
             ps.executeUpdate();
+        }
+    }
+
+    private static String getDemoStudentsJson() {
+        StringBuilder json = new StringBuilder("[");
+        for (int i = 0; i < demoStudents.size(); i++) {
+            if (i > 0) {
+                json.append(",");
+            }
+            json.append(demoStudents.get(i).toJson());
+        }
+        json.append("]");
+        return json.toString();
+    }
+
+    private static int nextDemoStudentId() {
+        int maxId = 0;
+        for (StudentRecord student : demoStudents) {
+            if (student.id > maxId) {
+                maxId = student.id;
+            }
+        }
+        return maxId + 1;
+    }
+
+    private static StudentRecord findDemoStudent(int id) {
+        for (StudentRecord student : demoStudents) {
+            if (student.id == id) {
+                return student;
+            }
+        }
+        return null;
+    }
+
+    private static String blankToEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
+    private static class StudentRecord {
+        private int id;
+        private String regNo;
+        private String name;
+        private String phone;
+        private String department;
+        private int semester;
+        private String email;
+        private int courseStartYear;
+        private int passoutYear;
+        private String studentStatus;
+        private int backPapers;
+        private String cgpa;
+        private String ogpa;
+        private String photo;
+        private String grade;
+        private String status;
+
+        StudentRecord(int id, String regNo, String name, String phone, String department, int semester,
+                      String email, int courseStartYear, int passoutYear, String studentStatus,
+                      int backPapers, String cgpa, String ogpa, String photo, String grade, String status) {
+            this.id = id;
+            this.regNo = regNo;
+            this.name = name;
+            this.phone = phone;
+            this.department = department;
+            this.semester = semester;
+            this.email = email;
+            this.courseStartYear = courseStartYear;
+            this.passoutYear = passoutYear;
+            this.studentStatus = studentStatus;
+            this.backPapers = backPapers;
+            this.cgpa = cgpa;
+            this.ogpa = ogpa;
+            this.photo = photo;
+            this.grade = grade;
+            this.status = status;
+        }
+
+        private String toJson() {
+            return "{"
+                    + "\"id\":" + id + ","
+                    + "\"regNo\":\"" + escapeJson(regNo) + "\","
+                    + "\"name\":\"" + escapeJson(name) + "\","
+                    + "\"phone\":\"" + escapeJson(phone) + "\","
+                    + "\"department\":\"" + escapeJson(department) + "\","
+                    + "\"semester\":" + semester + ","
+                    + "\"email\":\"" + escapeJson(email) + "\","
+                    + "\"courseStartYear\":" + courseStartYear + ","
+                    + "\"passoutYear\":" + passoutYear + ","
+                    + "\"studentStatus\":\"" + escapeJson(studentStatus) + "\","
+                    + "\"backPapers\":" + backPapers + ","
+                    + "\"cgpa\":\"" + escapeJson(cgpa) + "\","
+                    + "\"ogpa\":\"" + escapeJson(ogpa) + "\","
+                    + "\"photo\":\"" + escapeJson(photo) + "\","
+                    + "\"grade\":\"" + escapeJson(grade) + "\","
+                    + "\"status\":\"" + escapeJson(status) + "\""
+                    + "}";
         }
     }
 
