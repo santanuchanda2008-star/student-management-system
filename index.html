@@ -36,6 +36,13 @@
             <label for="newPassword">Password</label>
             <input type="password" id="newPassword" placeholder="Create password">
 
+            <label for="newEmail">Gmail</label>
+            <input type="email" id="newEmail" placeholder="Enter Gmail for OTP">
+
+            <label for="createOtp">OTP</label>
+            <input type="text" id="createOtp" placeholder="Enter OTP" maxlength="6" inputmode="numeric" oninput="cleanOtpInput('createOtp')">
+
+            <button class="secondary" onclick="sendOtp('create')">Send OTP</button>
             <button onclick="createAccount()">Create Account</button>
             <button class="secondary" onclick="showLoginPanel()">Back to Login</button>
             <p id="createMessage" class="message"></p>
@@ -52,6 +59,13 @@
             <label for="confirmForgotPassword">Confirm Password</label>
             <input type="password" id="confirmForgotPassword" placeholder="Confirm new password">
 
+            <label for="forgotEmail">Gmail</label>
+            <input type="email" id="forgotEmail" placeholder="Enter Gmail for OTP">
+
+            <label for="forgotOtp">OTP</label>
+            <input type="text" id="forgotOtp" placeholder="Enter OTP" maxlength="6" inputmode="numeric" oninput="cleanOtpInput('forgotOtp')">
+
+            <button class="secondary" onclick="sendOtp('forgot')">Send OTP</button>
             <button onclick="resetPassword()">Reset Password</button>
             <button class="secondary" onclick="showLoginPanel()">Back to Login</button>
             <p id="forgotMessage" class="message"></p>

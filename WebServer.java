@@ -2,28 +2,40 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.SecureRandom;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 
 public class WebServer {
     private static final int PORT = getPort();
+    private static final String GMAIL_USER = System.getenv("GMAIL_USER");
+    private static final String GMAIL_APP_PASSWORD = System.getenv("GMAIL_APP_PASSWORD");
+    private static final long OTP_VALID_MILLIS = 5 * 60 * 1000;
+    private static final SecureRandom OTP_RANDOM = new SecureRandom();
     private static boolean demoMode = false;
     private static final Map<String, String> demoPasswords = new HashMap<String, String>();
     private static final Map<String, String> demoRoles = new HashMap<String, String>();
+    private static final Map<String, OtpRecord> otpRecords = new HashMap<String, OtpRecord>();
     private static final List<StudentRecord> demoStudents = new ArrayList<StudentRecord>();
 
     public static void main(String[] args) throws Exception {
@@ -31,6 +43,7 @@ public class WebServer {
 
         HttpServer server = HttpServer.create(new InetSocketAddress("0.0.0.0", PORT), 0);
         server.createContext("/api/login", new LoginHandler());
+        server.createContext("/api/send-otp", new OtpHandler());
         server.createContext("/api/register", new RegisterHandler());
         server.createContext("/api/forgot-password", new ForgotPasswordHandler());
         server.createContext("/api/students", new StudentHandler());
@@ -339,6 +352,46 @@ public class WebServer {
         }
     }
 
+    private static class OtpHandler implements HttpHandler {
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!exchange.getRequestMethod().equalsIgnoreCase("POST")) {
+                send(exchange, 405, "{\"success\":false}");
+                return;
+            }
+
+            Map<String, String> form = readForm(exchange);
+            String username = form.get("username");
+            String email = form.get("email");
+            String purpose = form.get("purpose");
+
+            if (isBlank(username) || isBlank(email) || isBlank(purpose)) {
+                send(exchange, 200, "{\"success\":false,\"message\":\"Please enter username and Gmail\"}");
+                return;
+            }
+
+            if (!email.matches("[A-Za-z0-9._%+-]+@gmail\\.com")) {
+                send(exchange, 200, "{\"success\":false,\"message\":\"Please enter a valid Gmail address\"}");
+                return;
+            }
+
+            if (!isGmailConfigured()) {
+                send(exchange, 200, "{\"success\":false,\"message\":\"Gmail OTP is not configured on Render\"}");
+                return;
+            }
+
+            String otp = String.valueOf(100000 + OTP_RANDOM.nextInt(900000));
+            otpRecords.put(getOtpKey(purpose, username, email),
+                    new OtpRecord(otp, System.currentTimeMillis() + OTP_VALID_MILLIS));
+
+            try {
+                sendOtpMail(email, otp, purpose);
+                send(exchange, 200, "{\"success\":true,\"message\":\"OTP sent to Gmail. It is valid for 5 minutes.\"}");
+            } catch (IOException e) {
+                send(exchange, 200, "{\"success\":false,\"message\":\"OTP email could not be sent\"}");
+            }
+        }
+    }
+
     private static class RegisterHandler implements HttpHandler {
         public void handle(HttpExchange exchange) throws IOException {
             if (!exchange.getRequestMethod().equalsIgnoreCase("POST")) {
@@ -349,9 +402,16 @@ public class WebServer {
             Map<String, String> form = readForm(exchange);
             String username = form.get("username");
             String password = form.get("password");
+            String email = form.get("email");
+            String otp = form.get("otp");
 
-            if (isBlank(username) || isBlank(password)) {
-                send(exchange, 200, "{\"success\":false,\"message\":\"Please fill all account details\"}");
+            if (isBlank(username) || isBlank(password) || isBlank(email) || isBlank(otp)) {
+                send(exchange, 200, "{\"success\":false,\"message\":\"Please fill all account and OTP details\"}");
+                return;
+            }
+
+            if (!verifyOtp("create", username, email, otp)) {
+                send(exchange, 200, "{\"success\":false,\"message\":\"Invalid or expired OTP\"}");
                 return;
             }
 
@@ -401,14 +461,21 @@ public class WebServer {
             Map<String, String> form = readForm(exchange);
             String username = form.get("username");
             String password = form.get("password");
+            String email = form.get("email");
+            String otp = form.get("otp");
 
-            if (isBlank(username) || isBlank(password)) {
-                send(exchange, 200, "{\"success\":false,\"message\":\"Please fill all password reset details\"}");
+            if (isBlank(username) || isBlank(password) || isBlank(email) || isBlank(otp)) {
+                send(exchange, 200, "{\"success\":false,\"message\":\"Please fill all password reset and OTP details\"}");
                 return;
             }
 
             if (username.equalsIgnoreCase("admin")) {
                 send(exchange, 200, "{\"success\":false,\"message\":\"Admin password cannot be changed\"}");
+                return;
+            }
+
+            if (!verifyOtp("forgot", username, email, otp)) {
+                send(exchange, 200, "{\"success\":false,\"message\":\"Invalid or expired OTP\"}");
                 return;
             }
 
@@ -823,6 +890,86 @@ public class WebServer {
 
     private static String blankToEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private static boolean isGmailConfigured() {
+        return !isBlank(GMAIL_USER) && !isBlank(GMAIL_APP_PASSWORD);
+    }
+
+    private static String getOtpKey(String purpose, String username, String email) {
+        return purpose.toLowerCase() + ":" + username.toLowerCase() + ":" + email.toLowerCase();
+    }
+
+    private static boolean verifyOtp(String purpose, String username, String email, String otp) {
+        String key = getOtpKey(purpose, username, email);
+        OtpRecord record = otpRecords.get(key);
+
+        if (record == null || System.currentTimeMillis() > record.expiresAt || !record.otp.equals(otp)) {
+            return false;
+        }
+
+        otpRecords.remove(key);
+        return true;
+    }
+
+    private static void sendOtpMail(String toEmail, String otp, String purpose) throws IOException {
+        String subject = purpose.equals("forgot")
+                ? "Student Management System Password Reset OTP"
+                : "Student Management System Account OTP";
+        String body = "Your Student Management System OTP is " + otp
+                + ". It is valid for 5 minutes. Do not share this OTP.";
+
+        try (SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault()
+                .createSocket("smtp.gmail.com", 465);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+             PrintWriter writer = new PrintWriter(socket.getOutputStream(), true)) {
+
+            readSmtpResponse(reader);
+            sendSmtpCommand(writer, reader, "EHLO student-management-system");
+            sendSmtpCommand(writer, reader, "AUTH LOGIN");
+            sendSmtpCommand(writer, reader, Base64.getEncoder().encodeToString(GMAIL_USER.getBytes(StandardCharsets.UTF_8)));
+            sendSmtpCommand(writer, reader, Base64.getEncoder().encodeToString(GMAIL_APP_PASSWORD.getBytes(StandardCharsets.UTF_8)));
+            sendSmtpCommand(writer, reader, "MAIL FROM:<" + GMAIL_USER + ">");
+            sendSmtpCommand(writer, reader, "RCPT TO:<" + toEmail + ">");
+            sendSmtpCommand(writer, reader, "DATA");
+
+            writer.print("From: Student Management System <" + GMAIL_USER + ">\r\n");
+            writer.print("To: " + toEmail + "\r\n");
+            writer.print("Subject: " + subject + "\r\n");
+            writer.print("Content-Type: text/plain; charset=UTF-8\r\n");
+            writer.print("\r\n");
+            writer.print(body + "\r\n");
+            writer.print(".\r\n");
+            writer.flush();
+            readSmtpResponse(reader);
+            sendSmtpCommand(writer, reader, "QUIT");
+        }
+    }
+
+    private static void sendSmtpCommand(PrintWriter writer, BufferedReader reader, String command) throws IOException {
+        writer.print(command + "\r\n");
+        writer.flush();
+        readSmtpResponse(reader);
+    }
+
+    private static void readSmtpResponse(BufferedReader reader) throws IOException {
+        String line;
+        do {
+            line = reader.readLine();
+            if (line == null) {
+                throw new IOException("SMTP server closed connection");
+            }
+        } while (line.length() > 3 && line.charAt(3) == '-');
+    }
+
+    private static class OtpRecord {
+        private final String otp;
+        private final long expiresAt;
+
+        OtpRecord(String otp, long expiresAt) {
+            this.otp = otp;
+            this.expiresAt = expiresAt;
+        }
     }
 
     private static class StudentRecord {

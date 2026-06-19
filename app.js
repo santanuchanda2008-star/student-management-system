@@ -151,10 +151,14 @@ function showForgotPassword() {
 async function createAccount() {
     const username = document.getElementById("newUsername").value.trim();
     const password = document.getElementById("newPassword").value.trim();
+    const email = document.getElementById("newEmail").value.trim();
+    const otp = document.getElementById("createOtp").value.trim();
     const message = document.getElementById("createMessage");
 
-    if (!username || !password) {
-        message.textContent = "Please enter username and password.";
+    if (!username || !password || (usesServer && (!email || !otp))) {
+        message.textContent = usesServer
+            ? "Please enter username, password, Gmail, and OTP."
+            : "Please enter username and password.";
         return;
     }
 
@@ -167,7 +171,7 @@ async function createAccount() {
     if (usesServer) {
         const response = await fetch("/api/register", {
             method: "POST",
-            body: new URLSearchParams({ username: username, password: password })
+            body: new URLSearchParams({ username: username, password: password, email: email, otp: otp })
         });
         const result = await response.json();
 
@@ -196,20 +200,61 @@ async function createAccount() {
     clearCreateForm();
 }
 
+async function sendOtp(purpose) {
+    const isCreate = purpose === "create";
+    const emailInputId = isCreate ? "newEmail" : "forgotEmail";
+    const usernameInputId = isCreate ? "newUsername" : "forgotUsername";
+    const message = document.getElementById(isCreate ? "createMessage" : "forgotMessage");
+    const email = document.getElementById(emailInputId).value.trim();
+    const username = document.getElementById(usernameInputId).value.trim();
+
+    if (!username || !email) {
+        message.style.color = "#b42318";
+        message.textContent = "Please enter username and Gmail before sending OTP.";
+        return;
+    }
+
+    if (!/^[A-Za-z0-9._%+-]+@gmail\.com$/.test(email)) {
+        message.style.color = "#b42318";
+        message.textContent = "Please enter a valid Gmail address.";
+        return;
+    }
+
+    if (!usesServer) {
+        message.style.color = "#b42318";
+        message.textContent = "Real Gmail OTP works only on the Java server website.";
+        return;
+    }
+
+    const response = await fetch("/api/send-otp", {
+        method: "POST",
+        body: new URLSearchParams({ username: username, email: email, purpose: purpose })
+    });
+    const result = await response.json();
+    message.style.color = result.success ? "#067647" : "#b42318";
+    message.textContent = result.message || (result.success ? "OTP sent to Gmail." : "OTP could not be sent.");
+}
+
 function clearCreateForm() {
     document.getElementById("newUsername").value = "";
     document.getElementById("newPassword").value = "";
+    document.getElementById("newEmail").value = "";
+    document.getElementById("createOtp").value = "";
 }
 
 async function resetPassword() {
     const username = document.getElementById("forgotUsername").value.trim();
     const newPassword = document.getElementById("forgotPassword").value.trim();
     const confirmPassword = document.getElementById("confirmForgotPassword").value.trim();
+    const email = document.getElementById("forgotEmail").value.trim();
+    const otp = document.getElementById("forgotOtp").value.trim();
     const message = document.getElementById("forgotMessage");
 
-    if (!username || !newPassword || !confirmPassword) {
+    if (!username || !newPassword || !confirmPassword || (usesServer && (!email || !otp))) {
         message.style.color = "#b42318";
-        message.textContent = "Please fill all password reset details.";
+        message.textContent = usesServer
+            ? "Please fill all password reset and OTP details."
+            : "Please fill all password reset details.";
         return;
     }
 
@@ -228,7 +273,7 @@ async function resetPassword() {
     if (usesServer) {
         const response = await fetch("/api/forgot-password", {
             method: "POST",
-            body: new URLSearchParams({ username: username, password: newPassword })
+            body: new URLSearchParams({ username: username, password: newPassword, email: email, otp: otp })
         });
         const result = await response.json();
 
@@ -261,6 +306,8 @@ function clearForgotPasswordForm() {
     document.getElementById("forgotUsername").value = "";
     document.getElementById("forgotPassword").value = "";
     document.getElementById("confirmForgotPassword").value = "";
+    document.getElementById("forgotEmail").value = "";
+    document.getElementById("forgotOtp").value = "";
 }
 
 async function showDashboard() {
@@ -672,25 +719,10 @@ async function saveStudent() {
     };
 
     if (usesServer) {
-        const formData = new URLSearchParams({
-            regNo: regNo,
-            name: name,
-            phone: phone,
-            department: department,
-            semester: semester,
-            email: email,
-            courseStartYear: courseStartYear,
-            passoutYear: passoutYear,
-            backPapers: backPapers,
-            cgpa: cgpa,
-            ogpa: ogpa,
-            studentStatus: studentStatus,
-            photo: photo
-        });
         const url = editId ? "/api/students/" + editId : "/api/students";
         const method = editId ? "PUT" : "POST";
 
-        const response = await fetch(url, { method: method, body: formData });
+        const response = await fetch(url, { method: method, body: toFormBody(studentData) });
         const result = await response.json();
         if (!result.success) {
             alert(result.message || "Student could not be saved.");
@@ -704,6 +736,12 @@ async function saveStudent() {
     applyStudentChange(editId, studentData);
     saveData();
     renderStudents();
+}
+
+function toFormBody(data) {
+    return new URLSearchParams(
+        Object.entries(data).map(([key, value]) => [key, value == null ? "" : String(value)])
+    );
 }
 
 function applyStudentChange(editId, studentData) {
@@ -776,6 +814,11 @@ function cleanNameInput() {
 function cleanSemesterInput() {
     const semesterInput = document.getElementById("semester");
     semesterInput.value = semesterInput.value.replace(/\D/g, "").slice(0, 1);
+}
+
+function cleanOtpInput(inputId) {
+    const input = document.getElementById(inputId);
+    input.value = input.value.replace(/\D/g, "").slice(0, 6);
 }
 
 function cleanWholeNumberInput(inputId) {
@@ -936,16 +979,11 @@ async function saveGrade() {
     if (usesServer) {
         const response = await fetch("/api/students/" + studentId + "/grade", {
             method: "PUT",
-            body: new URLSearchParams({
+            body: toFormBody({
                 grade: grade,
                 cgpa: getLatestCgpaFromSemesterValues(semesterCgpas),
                 ogpa: ogpa,
-                sem1Cgpa: semesterCgpas.sem1Cgpa,
-                sem2Cgpa: semesterCgpas.sem2Cgpa,
-                sem3Cgpa: semesterCgpas.sem3Cgpa,
-                sem4Cgpa: semesterCgpas.sem4Cgpa,
-                sem5Cgpa: semesterCgpas.sem5Cgpa,
-                sem6Cgpa: semesterCgpas.sem6Cgpa
+                ...semesterCgpas
             })
         });
         const result = await response.json();
