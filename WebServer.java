@@ -387,7 +387,9 @@ public class WebServer {
                 sendOtpMail(email, otp, purpose);
                 send(exchange, 200, "{\"success\":true,\"message\":\"OTP sent to Gmail. It is valid for 5 minutes.\"}");
             } catch (IOException e) {
-                send(exchange, 200, "{\"success\":false,\"message\":\"OTP email could not be sent\"}");
+                System.out.println("OTP email error: " + e.getMessage());
+                send(exchange, 200, "{\"success\":false,\"message\":\"OTP email could not be sent: "
+                        + escapeJson(e.getMessage()) + "\"}");
             }
         }
     }
@@ -919,21 +921,24 @@ public class WebServer {
         String body = "Your Student Management System OTP is " + otp
                 + ". It is valid for 5 minutes. Do not share this OTP.";
 
+        String gmailUser = GMAIL_USER.trim();
+        String gmailAppPassword = GMAIL_APP_PASSWORD.replace(" ", "").trim();
+
         try (SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault()
                 .createSocket("smtp.gmail.com", 465);
              BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
              PrintWriter writer = new PrintWriter(socket.getOutputStream(), true)) {
 
-            readSmtpResponse(reader);
-            sendSmtpCommand(writer, reader, "EHLO student-management-system");
-            sendSmtpCommand(writer, reader, "AUTH LOGIN");
-            sendSmtpCommand(writer, reader, Base64.getEncoder().encodeToString(GMAIL_USER.getBytes(StandardCharsets.UTF_8)));
-            sendSmtpCommand(writer, reader, Base64.getEncoder().encodeToString(GMAIL_APP_PASSWORD.getBytes(StandardCharsets.UTF_8)));
-            sendSmtpCommand(writer, reader, "MAIL FROM:<" + GMAIL_USER + ">");
+            readExpectedSmtpResponse(reader, "220");
+            sendSmtpCommand(writer, reader, "EHLO student-management-system", "250");
+            sendSmtpCommand(writer, reader, "AUTH LOGIN", "334");
+            sendSmtpCommand(writer, reader, Base64.getEncoder().encodeToString(gmailUser.getBytes(StandardCharsets.UTF_8)), "334");
+            sendSmtpCommand(writer, reader, Base64.getEncoder().encodeToString(gmailAppPassword.getBytes(StandardCharsets.UTF_8)), "235");
+            sendSmtpCommand(writer, reader, "MAIL FROM:<" + gmailUser + ">", "250");
             sendSmtpCommand(writer, reader, "RCPT TO:<" + toEmail + ">");
-            sendSmtpCommand(writer, reader, "DATA");
+            sendSmtpCommand(writer, reader, "DATA", "354");
 
-            writer.print("From: Student Management System <" + GMAIL_USER + ">\r\n");
+            writer.print("From: Student Management System <" + gmailUser + ">\r\n");
             writer.print("To: " + toEmail + "\r\n");
             writer.print("Subject: " + subject + "\r\n");
             writer.print("Content-Type: text/plain; charset=UTF-8\r\n");
@@ -941,25 +946,42 @@ public class WebServer {
             writer.print(body + "\r\n");
             writer.print(".\r\n");
             writer.flush();
-            readSmtpResponse(reader);
-            sendSmtpCommand(writer, reader, "QUIT");
+            readExpectedSmtpResponse(reader, "250");
+            sendSmtpCommand(writer, reader, "QUIT", "221");
         }
     }
 
     private static void sendSmtpCommand(PrintWriter writer, BufferedReader reader, String command) throws IOException {
-        writer.print(command + "\r\n");
-        writer.flush();
-        readSmtpResponse(reader);
+        sendSmtpCommand(writer, reader, command, "250");
     }
 
-    private static void readSmtpResponse(BufferedReader reader) throws IOException {
+    private static void sendSmtpCommand(PrintWriter writer, BufferedReader reader, String command, String expectedCode) throws IOException {
+        writer.print(command + "\r\n");
+        writer.flush();
+        readExpectedSmtpResponse(reader, expectedCode);
+    }
+
+    private static void readExpectedSmtpResponse(BufferedReader reader, String expectedCode) throws IOException {
+        String response = readSmtpResponse(reader);
+        if (!response.startsWith(expectedCode)) {
+            throw new IOException(response);
+        }
+    }
+
+    private static String readSmtpResponse(BufferedReader reader) throws IOException {
         String line;
+        StringBuilder response = new StringBuilder();
         do {
             line = reader.readLine();
             if (line == null) {
                 throw new IOException("SMTP server closed connection");
             }
+            if (response.length() > 0) {
+                response.append(" ");
+            }
+            response.append(line);
         } while (line.length() > 3 && line.charAt(3) == '-');
+        return response.toString();
     }
 
     private static class OtpRecord {
