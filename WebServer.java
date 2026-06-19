@@ -7,7 +7,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.net.HttpURLConnection;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.net.Socket;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -31,6 +33,8 @@ public class WebServer {
     private static final int PORT = getPort();
     private static final String GMAIL_USER = System.getenv("GMAIL_USER");
     private static final String GMAIL_APP_PASSWORD = System.getenv("GMAIL_APP_PASSWORD");
+    private static final String BREVO_API_KEY = System.getenv("BREVO_API_KEY");
+    private static final String BREVO_SENDER_EMAIL = System.getenv("BREVO_SENDER_EMAIL");
     private static final long OTP_VALID_MILLIS = 5 * 60 * 1000;
     private static final int SMTP_TIMEOUT_MILLIS = 10000;
     private static final SecureRandom OTP_RANDOM = new SecureRandom();
@@ -376,8 +380,8 @@ public class WebServer {
                 return;
             }
 
-            if (!isGmailConfigured()) {
-                send(exchange, 200, "{\"success\":false,\"message\":\"Gmail OTP is not configured on Render\"}");
+            if (!isEmailConfigured()) {
+                send(exchange, 200, "{\"success\":false,\"message\":\"OTP email is not configured on Render\"}");
                 return;
             }
 
@@ -900,6 +904,14 @@ public class WebServer {
         return !isBlank(GMAIL_USER) && !isBlank(GMAIL_APP_PASSWORD);
     }
 
+    private static boolean isBrevoConfigured() {
+        return !isBlank(BREVO_API_KEY) && (!isBlank(BREVO_SENDER_EMAIL) || !isBlank(GMAIL_USER));
+    }
+
+    private static boolean isEmailConfigured() {
+        return isBrevoConfigured() || isGmailConfigured();
+    }
+
     private static String getOtpKey(String purpose, String username, String email) {
         return purpose.toLowerCase() + ":" + username.toLowerCase() + ":" + email.toLowerCase();
     }
@@ -922,6 +934,12 @@ public class WebServer {
                 : "Student Management System Account OTP";
         String body = "Your Student Management System OTP is " + otp
                 + ". It is valid for 5 minutes. Do not share this OTP.";
+
+        if (isBrevoConfigured()) {
+            sendOtpMailWithBrevo(toEmail, subject, body);
+            return;
+        }
+
         String gmailUser = GMAIL_USER.trim();
         String gmailAppPassword = GMAIL_APP_PASSWORD.replace(" ", "").trim();
 
@@ -935,6 +953,49 @@ public class WebServer {
                         + " | STARTTLS 587 failed: " + startTlsError.getMessage());
             }
         }
+    }
+
+    private static void sendOtpMailWithBrevo(String toEmail, String subject, String body) throws IOException {
+        String senderEmail = isBlank(BREVO_SENDER_EMAIL) ? GMAIL_USER.trim() : BREVO_SENDER_EMAIL.trim();
+        HttpURLConnection connection = (HttpURLConnection) URI
+                .create("https://api.brevo.com/v3/smtp/email")
+                .toURL()
+                .openConnection();
+        connection.setConnectTimeout(SMTP_TIMEOUT_MILLIS);
+        connection.setReadTimeout(SMTP_TIMEOUT_MILLIS);
+        connection.setRequestMethod("POST");
+        connection.setDoOutput(true);
+        connection.setRequestProperty("api-key", BREVO_API_KEY.trim());
+        connection.setRequestProperty("Accept", "application/json");
+        connection.setRequestProperty("Content-Type", "application/json");
+
+        String json = "{"
+                + "\"sender\":{\"name\":\"Student Management System\",\"email\":\"" + escapeJson(senderEmail) + "\"},"
+                + "\"to\":[{\"email\":\"" + escapeJson(toEmail) + "\"}],"
+                + "\"subject\":\"" + escapeJson(subject) + "\","
+                + "\"textContent\":\"" + escapeJson(body) + "\""
+                + "}";
+
+        try (OutputStream output = connection.getOutputStream()) {
+            output.write(json.getBytes(StandardCharsets.UTF_8));
+        }
+
+        int statusCode = connection.getResponseCode();
+        if (statusCode < 200 || statusCode >= 300) {
+            throw new IOException("Brevo API failed with status " + statusCode + ": " + readHttpResponse(connection));
+        }
+    }
+
+    private static String readHttpResponse(HttpURLConnection connection) throws IOException {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(
+                connection.getErrorStream() == null ? connection.getInputStream() : connection.getErrorStream(),
+                StandardCharsets.UTF_8));
+        StringBuilder response = new StringBuilder();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            response.append(line);
+        }
+        return response.toString();
     }
 
     private static void sendOtpMailWithSsl(String toEmail, String subject, String body,
