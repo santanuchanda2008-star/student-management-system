@@ -226,15 +226,23 @@ async function sendOtp(purpose) {
         return;
     }
 
-    const response = await fetch("/api/send-otp", {
-        method: "POST",
-        body: new URLSearchParams({ username: username, email: email, purpose: purpose })
-    });
-    const result = await response.json();
-    message.style.color = result.success ? "#067647" : "#b42318";
-    message.textContent = result.message || (result.success ? "OTP sent to Gmail." : "OTP could not be sent.");
-    if (result.success) {
-        alert("OTP sent successfully. Please check your Gmail inbox or spam folder.");
+    message.style.color = "#344054";
+    message.textContent = "Sending OTP, please wait...";
+
+    try {
+        const response = await fetch("/api/send-otp", {
+            method: "POST",
+            body: new URLSearchParams({ username: username, email: email, purpose: purpose })
+        });
+        const result = await response.json();
+        message.style.color = result.success ? "#067647" : "#b42318";
+        message.textContent = result.message || (result.success ? "OTP sent to Gmail." : "OTP could not be sent.");
+        if (result.success) {
+            alert("OTP sent successfully. Please check your Gmail inbox or spam folder.");
+        }
+    } catch (error) {
+        message.style.color = "#b42318";
+        message.textContent = "OTP request failed. Please refresh the website and try again.";
     }
 }
 
