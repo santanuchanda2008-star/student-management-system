@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -31,6 +32,7 @@ public class WebServer {
     private static final String GMAIL_USER = System.getenv("GMAIL_USER");
     private static final String GMAIL_APP_PASSWORD = System.getenv("GMAIL_APP_PASSWORD");
     private static final long OTP_VALID_MILLIS = 5 * 60 * 1000;
+    private static final int SMTP_TIMEOUT_MILLIS = 10000;
     private static final SecureRandom OTP_RANDOM = new SecureRandom();
     private static boolean demoMode = false;
     private static final Map<String, String> demoPasswords = new HashMap<String, String>();
@@ -920,35 +922,84 @@ public class WebServer {
                 : "Student Management System Account OTP";
         String body = "Your Student Management System OTP is " + otp
                 + ". It is valid for 5 minutes. Do not share this OTP.";
-
         String gmailUser = GMAIL_USER.trim();
         String gmailAppPassword = GMAIL_APP_PASSWORD.replace(" ", "").trim();
 
-        try (SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault()
-                .createSocket("smtp.gmail.com", 465);
-             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-             PrintWriter writer = new PrintWriter(socket.getOutputStream(), true)) {
-
-            readExpectedSmtpResponse(reader, "220");
-            sendSmtpCommand(writer, reader, "EHLO student-management-system", "250");
-            sendSmtpCommand(writer, reader, "AUTH LOGIN", "334");
-            sendSmtpCommand(writer, reader, Base64.getEncoder().encodeToString(gmailUser.getBytes(StandardCharsets.UTF_8)), "334");
-            sendSmtpCommand(writer, reader, Base64.getEncoder().encodeToString(gmailAppPassword.getBytes(StandardCharsets.UTF_8)), "235");
-            sendSmtpCommand(writer, reader, "MAIL FROM:<" + gmailUser + ">", "250");
-            sendSmtpCommand(writer, reader, "RCPT TO:<" + toEmail + ">");
-            sendSmtpCommand(writer, reader, "DATA", "354");
-
-            writer.print("From: Student Management System <" + gmailUser + ">\r\n");
-            writer.print("To: " + toEmail + "\r\n");
-            writer.print("Subject: " + subject + "\r\n");
-            writer.print("Content-Type: text/plain; charset=UTF-8\r\n");
-            writer.print("\r\n");
-            writer.print(body + "\r\n");
-            writer.print(".\r\n");
-            writer.flush();
-            readExpectedSmtpResponse(reader, "250");
-            sendSmtpCommand(writer, reader, "QUIT", "221");
+        try {
+            sendOtpMailWithSsl(toEmail, subject, body, gmailUser, gmailAppPassword);
+        } catch (IOException sslError) {
+            try {
+                sendOtpMailWithStartTls(toEmail, subject, body, gmailUser, gmailAppPassword);
+            } catch (IOException startTlsError) {
+                throw new IOException("SSL 465 failed: " + sslError.getMessage()
+                        + " | STARTTLS 587 failed: " + startTlsError.getMessage());
+            }
         }
+    }
+
+    private static void sendOtpMailWithSsl(String toEmail, String subject, String body,
+                                           String gmailUser, String gmailAppPassword) throws IOException {
+        try (SSLSocket socket = (SSLSocket) SSLSocketFactory.getDefault().createSocket()) {
+            socket.connect(new InetSocketAddress("smtp.gmail.com", 465), SMTP_TIMEOUT_MILLIS);
+            socket.setSoTimeout(SMTP_TIMEOUT_MILLIS);
+            socket.startHandshake();
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+            PrintWriter writer = new PrintWriter(socket.getOutputStream(), true);
+
+            sendAuthenticatedEmail(reader, writer, toEmail, subject, body, gmailUser, gmailAppPassword, true);
+        }
+    }
+
+    private static void sendOtpMailWithStartTls(String toEmail, String subject, String body,
+                                                String gmailUser, String gmailAppPassword) throws IOException {
+        try (Socket plainSocket = new Socket()) {
+            plainSocket.connect(new InetSocketAddress("smtp.gmail.com", 587), SMTP_TIMEOUT_MILLIS);
+            plainSocket.setSoTimeout(SMTP_TIMEOUT_MILLIS);
+
+            BufferedReader plainReader = new BufferedReader(new InputStreamReader(plainSocket.getInputStream(), StandardCharsets.UTF_8));
+            PrintWriter plainWriter = new PrintWriter(plainSocket.getOutputStream(), true);
+
+            readExpectedSmtpResponse(plainReader, "220");
+            sendSmtpCommand(plainWriter, plainReader, "EHLO student-management-system", "250");
+            sendSmtpCommand(plainWriter, plainReader, "STARTTLS", "220");
+
+            SSLSocketFactory sslFactory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+            SSLSocket sslSocket = (SSLSocket) sslFactory.createSocket(plainSocket, "smtp.gmail.com", 587, true);
+            sslSocket.setSoTimeout(SMTP_TIMEOUT_MILLIS);
+            sslSocket.startHandshake();
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(sslSocket.getInputStream(), StandardCharsets.UTF_8));
+            PrintWriter writer = new PrintWriter(sslSocket.getOutputStream(), true);
+
+            sendAuthenticatedEmail(reader, writer, toEmail, subject, body, gmailUser, gmailAppPassword, false);
+        }
+    }
+
+    private static void sendAuthenticatedEmail(BufferedReader reader, PrintWriter writer, String toEmail,
+                                               String subject, String body, String gmailUser,
+                                               String gmailAppPassword, boolean readGreeting) throws IOException {
+        if (readGreeting) {
+            readExpectedSmtpResponse(reader, "220");
+        }
+        sendSmtpCommand(writer, reader, "EHLO student-management-system", "250");
+        sendSmtpCommand(writer, reader, "AUTH LOGIN", "334");
+        sendSmtpCommand(writer, reader, Base64.getEncoder().encodeToString(gmailUser.getBytes(StandardCharsets.UTF_8)), "334");
+        sendSmtpCommand(writer, reader, Base64.getEncoder().encodeToString(gmailAppPassword.getBytes(StandardCharsets.UTF_8)), "235");
+        sendSmtpCommand(writer, reader, "MAIL FROM:<" + gmailUser + ">", "250");
+        sendSmtpCommand(writer, reader, "RCPT TO:<" + toEmail + ">");
+        sendSmtpCommand(writer, reader, "DATA", "354");
+
+        writer.print("From: Student Management System <" + gmailUser + ">\r\n");
+        writer.print("To: " + toEmail + "\r\n");
+        writer.print("Subject: " + subject + "\r\n");
+        writer.print("Content-Type: text/plain; charset=UTF-8\r\n");
+        writer.print("\r\n");
+        writer.print(body + "\r\n");
+        writer.print(".\r\n");
+        writer.flush();
+        readExpectedSmtpResponse(reader, "250");
+        sendSmtpCommand(writer, reader, "QUIT", "221");
     }
 
     private static void sendSmtpCommand(PrintWriter writer, BufferedReader reader, String command) throws IOException {
