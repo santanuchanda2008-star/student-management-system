@@ -233,6 +233,9 @@ async function sendOtp(purpose) {
     const result = await response.json();
     message.style.color = result.success ? "#067647" : "#b42318";
     message.textContent = result.message || (result.success ? "OTP sent to Gmail." : "OTP could not be sent.");
+    if (result.success) {
+        alert("OTP sent successfully. Please check your Gmail inbox or spam folder.");
+    }
 }
 
 function clearCreateForm() {
